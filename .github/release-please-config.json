@@ -1,5 +1,20 @@
 {
   "release-type": "python",
+  "prerelease": true,
+  "prerelease-type": "alpha",
+  "bump-minor-pre-major": true,
+  "draft": true,
+  "changelog-sections": [
+    { "type": "feat",     "section": "Features" },
+    { "type": "fix",      "section": "Bug fixes" },
+    { "type": "perf",     "section": "Performance" },
+    { "type": "docs",     "section": "Documentation" },
+    { "type": "refactor", "section": "Refactoring" },
+    { "type": "build",    "section": "Build system" },
+    { "type": "test",     "section": "Tests", "hidden": true },
+    { "type": "ci",       "section": "CI", "hidden": true },
+    { "type": "chore",    "section": "Chores", "hidden": true }
+  ],
   "packages": {
     ".": {
       "package-name": "gov-gh",
