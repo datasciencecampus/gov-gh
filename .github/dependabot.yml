@@ -5,8 +5,8 @@
 
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/requirements"
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "tuesday"
@@ -20,11 +20,10 @@ updates:
       pip-major:
         update-types:
           - "major"
-    labels: ["dependencies", "pip", "automation"]
+    labels: ["dependencies", "uv", "automation"]
     open-pull-requests-limit: 10
     commit-message:
-      prefix: "chore"
-      include: "scope"
+      prefix: "chore(uv)"
 
 
   # Github actions in workflows
@@ -43,8 +42,7 @@ updates:
       github-actions-major:
         update-types:
           - "major"
-    labels: ["dependencies", "github_actions", "automation"]
+    labels: ["dependencies", "github-actions", "automation"]
     open-pull-requests-limit: 10
     commit-message:
-      prefix: "chore"
-      include: "scope"
+      prefix: "chore(github-actions)"
