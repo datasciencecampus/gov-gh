@@ -26,7 +26,7 @@ Source code lives under `src/gov_gh/` (src layout). The intended module breakdow
 - **`uv`** — dependency and virtual environment management; do not use bare `pip install`
 - **Ruff** — linting and formatting; line length 88, targets `E`, `F`, `I` rule sets
 - **pytest** — test runner; tests live in `tests/`, named `test_<module>.py`
-- **pre-commit** — hooks enforce secrets detection, large files, spelling, ruff lint and format
+- **pre-commit** — hooks enforce secrets detection, large files, Ruff lint and format; Codespell runs in CI
 
 ## Code conventions
 
