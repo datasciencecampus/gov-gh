@@ -153,3 +153,17 @@ This package is developed within the UK public sector and must adhere to the fol
 - Dependabot runs weekly (Tuesday 07:00 Europe/London) for both `uv` (Python) and GitHub Actions dependencies
 - Minor and patch updates are grouped; major updates are separate
 - Dependabot PRs use the `chore(uv)` or `chore(github-actions)` commit prefix
+
+## GitHub Actions
+
+All Actions used in workflows must be pinned to a full commit SHA, not a tag or branch. Tags are mutable and can be silently redirected — pinning to a SHA guarantees the exact code that was reviewed is what runs.
+
+```yaml
+# Correct — pinned to commit SHA
+- uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.0.0
+
+# Wrong — tag can be moved
+- uses: actions/checkout@v4
+```
+
+The SHA should be followed by a comment indicating the corresponding tag for human readability. Dependabot will keep SHAs up to date automatically.
