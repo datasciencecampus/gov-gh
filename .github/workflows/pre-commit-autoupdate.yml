@@ -1,0 +1,40 @@
+name: Pre-commit autoupdate
+
+on:
+  schedule:
+    - cron: "0 7 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    # NOTE: This repository is a template. When a new repo is created from it,
+    # we keep the workflow but disable scheduled runs by default.
+    # Manual runs via workflow_dispatch still work everywhere.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.repository == 'datasciencecampus/project-repo-template' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install pre-commit
+        run: python -m pip install --upgrade pip pre-commit
+
+      - name: Run pre-commit autoupdate
+        run: pre-commit autoupdate --freeze
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          commit-message: "chore(pre-commit): autoupdate hooks"
+          title: "chore(pre-commit): autoupdate hooks"
+          body: "Automated pre-commit hook updates."
+          labels: automation, pre-commit
+          branch: chore/pre-commit-autoupdate
