@@ -30,7 +30,7 @@ gov-gh/
 │       ├── config.py            # Configuration settings and environment variables
 │       ├── issues.py            # Create, retrieve, update and manage issues
 │       ├── members.py           # Manage organisation members, teams and permissions
-│       ├── models.py            # Shared dataclasses/Pydantic models/domain objects
+│       ├── models.py            # Shared Pydantic models for API data objects
 │       ├── organisation.py      # Organisation-wide administration, governance and policy
 │       └── repositories.py      # Repository management operations
 ```
