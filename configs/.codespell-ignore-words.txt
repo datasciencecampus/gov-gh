@@ -1,0 +1,4 @@
+# Add words to ignore for this repository, one per line.
+# Example:
+datasciencecampus
+ons
