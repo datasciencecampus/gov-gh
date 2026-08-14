@@ -65,19 +65,7 @@ See [configs/](configs/) for available configuration options.
 ## Usage
 
 > [!NOTE]
-> Usage examples will be updated as the package is developed.
-
-```python
-from gov_gh.client import GitHubClient
-from gov_gh.repositories import RepositoryManager
-
-client = GitHubClient()
-repos = RepositoryManager(client)
-
-# List all repositories in an organisation
-for repo in repos.list_repos(org="my-org"):
-    print(repo.name)
-```
+> The SDK client and repository manager are planned but not yet implemented. Usage examples will be added alongside those modules.
 
 ## Development
 
