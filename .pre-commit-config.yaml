@@ -1,3 +1,5 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
 # exclude: ^vendor/
 
@@ -20,4 +22,28 @@ repos:
     rev: 68e8b45440415753fff70a312ece8da92ba85b4a  # frozen: v1.5.0
     hooks:
     -   id: detect-secrets
-        exclude: package.lock.json
+        args: ["--baseline", "configs/.secrets.baseline"]
+        exclude: '(^package\.lock\.json$|^configs/\.secrets\.baseline$)'
+
+# ----- Conventional commits - Enforces Conventional Commits format in commit messages.
+-   repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+    -   id: conventional-pre-commit
+        stages: [commit-msg]
+
+# ----- Ruff - Fast Python linter and formatter.
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+    -   id: ruff
+    -   id: ruff-format
+
+# ----- Checkov - Security checks for GitHub Actions workflows.
+-   repo: local
+    hooks:
+    -   id: checkov-github-actions
+        name: checkov-github-actions
+        entry: uvx --with checkov checkov --directory .github/workflows --framework github_actions --quiet
+        language: system
+        pass_filenames: false
