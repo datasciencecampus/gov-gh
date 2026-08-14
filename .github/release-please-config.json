@@ -1,0 +1,9 @@
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "package-name": "gov-gh",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
