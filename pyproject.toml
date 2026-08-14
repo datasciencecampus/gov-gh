@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
-  { name = "Office For National Statistics" }
+  { name = "Office for National Statistics" }
 ]
 dependencies = []
 
