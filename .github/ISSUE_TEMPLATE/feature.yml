@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest a new feature or enhancement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      description: Describe the feature from the perspective of the user.
+      placeholder: |
+        As a [type of user],
+        I want [some goal],
+        So that [some reason].
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Define the conditions that must be met for this feature to be considered complete.
+      placeholder: |
+        Scenario: [description]
+          Given [some context]
+          When [some action]
+          Then [expected outcome]
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other relevant information, mockups, or examples.
+    validations:
+      required: false
