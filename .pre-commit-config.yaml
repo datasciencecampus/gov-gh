@@ -23,18 +23,18 @@ repos:
     hooks:
     -   id: detect-secrets
         args: ["--baseline", "configs/.secrets.baseline"]
-        exclude: '(^package\.lock\.json$|^configs/\.secrets\.baseline$)'
+        exclude: '(^package\.lock\.json$|^configs/\.secrets\.baseline$|^\.pre-commit-config\.yaml$)'
 
 # ----- Conventional commits - Enforces Conventional Commits format in commit messages.
 -   repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.2.0
+    rev: 3db014c16a9d31997ab8c07a4d61fcce936c8f0d  # frozen: v4.4.0
     hooks:
     -   id: conventional-pre-commit
         stages: [commit-msg]
 
 # ----- Ruff - Fast Python linter and formatter.
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: 65dbdb59d2f2d9c3bdc343c566821ad3319ddaa3  # frozen: v0.16.3
     hooks:
     -   id: ruff
     -   id: ruff-format
