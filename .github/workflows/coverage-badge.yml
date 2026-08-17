@@ -1,0 +1,68 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Run coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run tests with coverage
+        run: uv run pytest --cov=gov_gh --cov-report=term-missing --cov-report=xml
+
+      - name: Write coverage summary
+        run: |
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET
+          import os
+
+          tree = ET.parse("coverage.xml")
+          root = tree.getroot()
+
+          total = float(root.attrib.get("line-rate", 0)) * 100
+
+          if total >= 90:
+              indicator = "🟢"
+          elif total >= 70:
+              indicator = "🟡"
+          else:
+              indicator = "🔴"
+
+          lines = []
+          lines.append(f"## {indicator} Coverage — {total:.1f}%\n")
+          lines.append("| Module | Statements | Missing | Coverage |")
+          lines.append("|---|---:|---:|---:|")
+
+          for package in root.iter("package"):
+              for cls in package.iter("class"):
+                  name = cls.attrib.get("filename", "").replace("src/", "")
+                  stmts = int(cls.attrib.get("line-rate", 0) and cls.find("lines") is not None and len(cls.find("lines")) or 0)
+                  hits = sum(1 for l in (cls.find("lines") or []) if l.attrib.get("hits", "0") != "0")
+                  total_lines = len(cls.find("lines")) if cls.find("lines") is not None else 0
+                  missing = total_lines - hits
+                  pct = (hits / total_lines * 100) if total_lines else 100
+                  lines.append(f"| `{name}` | {total_lines} | {missing} | {pct:.1f}% |")
+
+          lines.append(f"\n**Total: {total:.1f}%**")
+
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary, "a") as f:
+              f.write("\n".join(lines) + "\n")
+          EOF

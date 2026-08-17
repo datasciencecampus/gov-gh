@@ -1,0 +1,56 @@
+name: Codespell
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codespell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Build ignore regex
+        id: ignore_regex
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          ignore_file = Path('configs/.codespell-ignore-words.txt')
+          words = []
+
+          if ignore_file.exists():
+            for line in ignore_file.read_text(encoding='utf-8').splitlines():
+              line = line.strip()
+              if line and not line.startswith('#'):
+                words.append(re.escape(line))
+
+          pattern = ''
+          if words:
+            pattern = r'(?i)\\b(?:' + '|'.join(words) + r')\\b'
+
+          with Path(__import__('os').environ['GITHUB_OUTPUT']).open('a', encoding='utf-8') as f:
+            f.write(f'pattern={pattern}\n')
+          PY
+
+      - name: Run codespell
+        run: uvx --with codespell codespell . --toml pyproject.toml --ignore-regex "${{ steps.ignore_regex.outputs.pattern }}"
