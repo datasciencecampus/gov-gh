@@ -3,7 +3,7 @@
   "prerelease": true,
   "prerelease-type": "alpha",
   "bump-minor-pre-major": true,
-  "draft": true,
+  "draft": false,
   "changelog-sections": [
     { "type": "feat",     "section": "Features" },
     { "type": "fix",      "section": "Bug fixes" },
