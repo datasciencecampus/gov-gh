@@ -1,20 +1,13 @@
 from pydantic import SecretStr
-
 from collections.abc import Callable, Iterator
 from typing import Any, cast
 from time import sleep
-
 from gql import Client, gql
-from gql.execution import ExecutionResult
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
-
 from logging import Logger
-from exceptions import GraphQLResponseError
-
+from gov_gh.exceptions import GraphQLResponseError
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
-
-
 def _get_auth_headers(token: SecretStr) -> dict:
     """Generate authentication headers for GitHub API requests.
     Works for both REST and GraphQL endpoints.
@@ -23,14 +16,10 @@ def _get_auth_headers(token: SecretStr) -> dict:
         "Authorization": f"Bearer {token.get_secret_value()}",
         "Accept": "application/vnd.github+json",
     }
-
-
 def _get_graphql_client(token: SecretStr) -> Client:
     """Create a configured GraphQL client instance.
-
     Args:
         token: Personal access token with appropriate permissions.
-
     Returns:
         Client: Configured GraphQL client instance.
     """
@@ -40,10 +29,7 @@ def _get_graphql_client(token: SecretStr) -> Client:
         timeout=30,
         verify=True,
     )
-
     return Client(transport=transport, fetch_schema_from_transport=True)
-
-
 def _is_retriable(error: Exception) -> bool:
     """Determine if an error is retriable based on its type and HTTP status code."""
     if isinstance(error, TransportQueryError): #Forbidden, Syntax Errors
@@ -51,7 +37,6 @@ def _is_retriable(error: Exception) -> bool:
     if isinstance(error, TransportServerError): #HTTP Level Errors 404, 403 should not be retried, but some 5xx may
         return error.code in (500, 502, 503, 504)
     return True 
-
 def _execute_graphql_query(
     client: Client,
     query: str,
@@ -60,21 +45,17 @@ def _execute_graphql_query(
     max_retries: int = 3,
 ) -> dict[str, Any]:
     """Execute a GraphQL query with retry logic for transient errors.
-
     Args:
         client: Configured GraphQL client instance.
         query: Compiled GraphQL query object.
         variables: Dictionary of variables to pass to the query.
         logger: Logger instance for logging retries and errors.
         max_retries: Maximum number of retry attempts for transient errors.
-
     Returns:
         Dict[str, Any]: The result of the GraphQL query execution.
-
     Raises:
         Exception: If the query fails after the maximum number of retries or a non-retriable error occurs.
     """
-
     attempt = 0 
     while True: 
         try: 
@@ -132,7 +113,7 @@ def _get_connection(result: dict[str, Any], connection_path: list[str]) -> dict[
             )
     return connection
 
-def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple(dict[str, Any] | None, dict[str, Any] | None):
+def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Extract the nodes and edges from a GraphQL result.
     
     args:
@@ -144,7 +125,6 @@ def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple(di
     """
     edges = connection.get("edges")
     nodes = connection.get("nodes")
-
     if edges is not None:
         if not isinstance(edges, list):
             raise GraphQLResponseError(
@@ -166,7 +146,6 @@ def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple(di
         )
     return nodes, edges
     
-
 def paginate_connection[T](
     client: Client,
     query_str: str,
@@ -179,7 +158,6 @@ def paginate_connection[T](
     filter: Callable[[dict[str, Any], dict[str, Any]], bool] = (lambda _node, _edge: True),
 ) -> Iterator[T]:
     """Helper to paginate through a GraphQL connection.
-
     Args:
         client: Configured GraphQL client instance.
         query_str: GraphQL query string with $org and $cursor variables.
@@ -190,7 +168,6 @@ def paginate_connection[T](
         page_size: Number of items per page (default is 50).
         transform: Optional function to transform raw node and edge dicts before yielding (default is identity).
         filter: Optional predicate to filter raw node and edge dicts before transformation/yielding (default yields all).
-
     Yields:
         T: Transformed node from the connection.
     """
@@ -202,10 +179,10 @@ def paginate_connection[T](
         result = _execute_graphql_query(client, query, n_variables, logger)
         connection = _get_connection(result, connection_path)
         nodes, edges = _get_connection_data(connection, logger)
-        for nodes, edges in zip(nodes, edges):
-            if filter(nodes, edges):
-                yield transform(nodes, edges)
-
+        edge_iter = edges if edges is not None else [None] * len(nodes)
+        for node, edge in zip(nodes, edge_iter):
+            if filter(node, edge):
+                yield transform(node, edge)
         page_info = connection.get("pageInfo")
         if not page_info:
             raise GraphQLResponseError(
@@ -226,4 +203,3 @@ def paginate_connection[T](
         
         
         
-
