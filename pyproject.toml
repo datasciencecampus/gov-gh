@@ -13,7 +13,8 @@ authors = [
   { name = "Office for National Statistics" }
 ]
 dependencies = [
-    "gql>=4.0.0",
+    "gql[requests]>=4.0.0",
+    "pydantic>=2.13.4",
 ]
 
 [dependency-groups]
