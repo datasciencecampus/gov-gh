@@ -7,7 +7,10 @@ from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 from logging import Logger
 from gov_gh.exceptions import GraphQLResponseError
+
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
+
+
 def _get_auth_headers(token: SecretStr) -> dict:
     """Generate authentication headers for GitHub API requests.
     Works for both REST and GraphQL endpoints.
@@ -16,6 +19,8 @@ def _get_auth_headers(token: SecretStr) -> dict:
         "Authorization": f"Bearer {token.get_secret_value()}",
         "Accept": "application/vnd.github+json",
     }
+
+
 def _get_graphql_client(token: SecretStr) -> Client:
     """Create a configured GraphQL client instance.
     Args:
@@ -30,13 +35,19 @@ def _get_graphql_client(token: SecretStr) -> Client:
         verify=True,
     )
     return Client(transport=transport, fetch_schema_from_transport=True)
+
+
 def _is_retriable(error: Exception) -> bool:
     """Determine if an error is retriable based on its type and HTTP status code."""
-    if isinstance(error, TransportQueryError): #Forbidden, Syntax Errors
+    if isinstance(error, TransportQueryError):  # Forbidden, Syntax Errors
         return False
-    if isinstance(error, TransportServerError): #HTTP Level Errors 404, 403 should not be retried, but some 5xx may
+    if isinstance(
+        error, TransportServerError
+    ):  # HTTP Level Errors 404, 403 should not be retried, but some 5xx may
         return error.code in (500, 502, 503, 504)
-    return True 
+    return True
+
+
 def _execute_graphql_query(
     client: Client,
     query: str,
@@ -56,14 +67,14 @@ def _execute_graphql_query(
     Raises:
         Exception: If the query fails after the maximum number of retries or a non-retriable error occurs.
     """
-    attempt = 0 
-    while True: 
-        try: 
+    attempt = 0
+    while True:
+        try:
             result: dict[str, Any] = client.execute(query, variable_values=variables)
             return result
         except Exception as e:
-            if _is_retriable(e): 
-                if attempt < max_retries: # Case retriable
+            if _is_retriable(e):
+                if attempt < max_retries:  # Case retriable
                     attempt += 1
                     backoff = 2 ** (attempt - 1)
                     logger.warning(
@@ -71,25 +82,26 @@ def _execute_graphql_query(
                         attempt,
                         max_retries,
                         e,
-                        backoff
+                        backoff,
                     )
                     sleep(backoff)
-                else: # Too many retries
+                else:  # Too many retries
                     logger.error(
                         "GraphQl query failed after %d/%d attempts",
                         attempt,
-                        max_retries
+                        max_retries,
                     )
                     raise
-            else: # Non-retriable error
-                logger.error(
-                    "GraphQL query failed with non-retriable error: %s",
-                    e
-                )
+            else:  # Non-retriable error
+                logger.error("GraphQL query failed with non-retriable error: %s", e)
                 raise
-def _get_connection(result: dict[str, Any], connection_path: list[str]) -> dict[str, Any]:
+
+
+def _get_connection(
+    result: dict[str, Any], connection_path: list[str]
+) -> dict[str, Any]:
     """Extract the connection data from a GraphQL result based on the provided path.
-    
+
     Args:
         result: The GraphQL query result.
         connection_path: The path to the connection field in the result.
@@ -102,20 +114,17 @@ def _get_connection(result: dict[str, Any], connection_path: list[str]) -> dict[
     for key in connection_path:
         connection = connection.get(key)
         if connection is None:
-            raise GraphQLResponseError(
-                "Unexpected Response: %s is missing",
-                key
-            )
+            raise GraphQLResponseError("Unexpected Response: %s is missing", key)
         elif not isinstance(connection, dict):
-            raise GraphQLResponseError(
-                "Unexpected Response: %s is not a dict",
-                key
-            )
+            raise GraphQLResponseError("Unexpected Response: %s is not a dict", key)
     return connection
 
-def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+
+def _get_connection_data(
+    connection: dict[str, Any], logger: Logger
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Extract the nodes and edges from a GraphQL result.
-    
+
     args:
         connection: The GraphQL query result.
         logger: Logger instance for logging.
@@ -127,17 +136,13 @@ def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple[di
     nodes = connection.get("nodes")
     if edges is not None:
         if not isinstance(edges, list):
-            raise GraphQLResponseError(
-                "Unexpected Response: edges is not a list"
-            )
+            raise GraphQLResponseError("Unexpected Response: edges is not a list")
         else:
             logger.debug("Edges found in connection: %d", len(edges))
         nodes = [edge.get("node") for edge in edges if edge.get("node") is not None]
     elif nodes is not None:
         if not isinstance(nodes, list):
-            raise GraphQLResponseError(
-                "Unexpected Response: nodes is not a list"
-            )
+            raise GraphQLResponseError("Unexpected Response: nodes is not a list")
         else:
             logger.debug("Nodes found in connection: %d", len(nodes))
     else:
@@ -145,7 +150,8 @@ def _get_connection_data(connection: dict[str, Any], logger: Logger) -> tuple[di
             "Unexpected Response: neither edges nor nodes are present"
         )
     return nodes, edges
-    
+
+
 def paginate_connection[T](
     client: Client,
     query_str: str,
@@ -154,8 +160,10 @@ def paginate_connection[T](
     connection_path: list[str],
     node_key: str = "nodes",
     page_size: int = 50,
-    transform: Callable[[dict[str, Any], dict[str, Any]], T] = (lambda x, y: (x ,y)),
-    filter: Callable[[dict[str, Any], dict[str, Any]], bool] = (lambda _node, _edge: True),
+    transform: Callable[[dict[str, Any], dict[str, Any]], T] = (lambda x, y: (x, y)),
+    filter: Callable[[dict[str, Any], dict[str, Any]], bool] = (
+        lambda _node, _edge: True
+    ),
 ) -> Iterator[T]:
     """Helper to paginate through a GraphQL connection.
     Args:
@@ -197,9 +205,6 @@ def paginate_connection[T](
                 page_index + 1,
                 page_index * page_size + len(nodes),
                 connection_path,
-                page_size
+                page_size,
             )
             break
-        
-        
-        
