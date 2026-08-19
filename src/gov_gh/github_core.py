@@ -87,7 +87,7 @@ def _execute_graphql_query(
                     sleep(backoff)
                 else:  # Too many retries
                     logger.error(
-                        "GraphQl query failed after %d/%d attempts",
+                        "GraphQL query failed after %d/%d attempts",
                         attempt,
                         max_retries,
                     )
@@ -114,15 +114,15 @@ def _get_connection(
     for key in connection_path:
         connection = connection.get(key)
         if connection is None:
-            raise GraphQLResponseError("Unexpected Response: %s is missing", key)
+            raise GraphQLResponseError(f"Unexpected Response: {key} is missing")
         elif not isinstance(connection, dict):
-            raise GraphQLResponseError("Unexpected Response: %s is not a dict", key)
+            raise GraphQLResponseError(f"Unexpected Response: {key} is not a dict")
     return connection
 
 
 def _get_connection_data(
     connection: dict[str, Any], logger: Logger
-) -> dict[str, Any]:
+) -> list[dict[str, Any]]:
     """Extract the nodes or edges from a GraphQL result.
 
     args:
