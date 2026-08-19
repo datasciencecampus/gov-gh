@@ -122,15 +122,14 @@ def _get_connection(
 
 def _get_connection_data(
     connection: dict[str, Any], logger: Logger
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Extract the nodes and edges from a GraphQL result.
+) -> dict[str, Any]:
+    """Extract the nodes or edges from a GraphQL result.
 
     args:
         connection: The GraphQL query result.
         logger: Logger instance for logging.
     Returns:
-        dict[str, Any] | None: The nodes from the result if present, otherwise None.
-        dict[str, Any] | None: The edges from the result if present, otherwise None.
+        dict[str, Any] | None: The node or edges if edges available defaults to edges
     """
     edges = connection.get("edges")
     nodes = connection.get("nodes")
@@ -139,17 +138,17 @@ def _get_connection_data(
             raise GraphQLResponseError("Unexpected Response: edges is not a list")
         else:
             logger.debug("Edges found in connection: %d", len(edges))
-        nodes = [edge.get("node") for edge in edges if edge.get("node") is not None]
+            return edges
     elif nodes is not None:
         if not isinstance(nodes, list):
             raise GraphQLResponseError("Unexpected Response: nodes is not a list")
         else:
             logger.debug("Nodes found in connection: %d", len(nodes))
+            return nodes
     else:
         raise GraphQLResponseError(
             "Unexpected Response: neither edges nor nodes are present"
         )
-    return nodes, edges
 
 
 def paginate_connection[T](
@@ -160,9 +159,9 @@ def paginate_connection[T](
     connection_path: list[str],
     node_key: str = "nodes",
     page_size: int = 50,
-    transform: Callable[[dict[str, Any], dict[str, Any]], T] = (lambda x, y: (x, y)),
-    filter: Callable[[dict[str, Any], dict[str, Any]], bool] = (
-        lambda _node, _edge: True
+    transform: Callable[[dict[str, Any]], T] = (lambda x: x),
+    filter: Callable[[dict[str, Any]], bool] = (
+        lambda _node: True
     ),
 ) -> Iterator[T]:
     """Helper to paginate through a GraphQL connection.
@@ -174,8 +173,8 @@ def paginate_connection[T](
         connection_path: Path to the connection field in the GraphQL response (e.g. ["organization", "repositories"]).
         node_key: Key for the nodes in the connection (default is "nodes").
         page_size: Number of items per page (default is 50).
-        transform: Optional function to transform raw node and edge dicts before yielding (default is identity).
-        filter: Optional predicate to filter raw node and edge dicts before transformation/yielding (default yields all).
+        transform: Optional function to transform raw node or edge dicts before yielding (default is identity).
+        filter: Optional predicate to filter raw node or edge dicts before transformation/yielding (default yields all).
     Yields:
         T: Transformed node from the connection.
     """
@@ -186,11 +185,10 @@ def paginate_connection[T](
         n_variables = variables | {"cursor": cursor}
         result = _execute_graphql_query(client, query, n_variables, logger)
         connection = _get_connection(result, connection_path)
-        nodes, edges = _get_connection_data(connection, logger)
-        edge_iter = edges if edges is not None else [None] * len(nodes)
-        for node, edge in zip(nodes, edge_iter):
-            if filter(node, edge):
-                yield transform(node, edge)
+        data = _get_connection_data(connection, logger)
+        for item in data:
+            if filter(item):
+                yield transform(item)
         page_info = connection.get("pageInfo")
         if not page_info:
             raise GraphQLResponseError(
@@ -203,7 +201,7 @@ def paginate_connection[T](
             logger.info(
                 "Pagination complete after %d pages, %d total items for connection path: %s (page_size: %d)",
                 page_index + 1,
-                page_index * page_size + len(nodes),
+                page_index * page_size + len(data),
                 connection_path,
                 page_size,
             )
