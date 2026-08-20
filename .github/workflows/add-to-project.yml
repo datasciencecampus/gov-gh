@@ -11,6 +11,21 @@ jobs:
     name: Add issue to project
     runs-on: ubuntu-latest
     steps:
+      - name: Validate repository variable
+        run: |
+          if [[ -z "${{ vars.GITHUB_PROJECT_URL }}" ]]; then
+            echo "❌ GITHUB_PROJECT_URL repository variable is not set"
+            echo ""
+            echo "Required Action:"
+            echo "1. Go to: https://github.com/${{ github.repository }}/settings/variables"
+            echo "2. Click 'New repository variable'"
+            echo "3. Set Name: GITHUB_PROJECT_URL"
+            echo "4. Set Value: https://github.com/orgs/datasciencecampus/projects/194"
+            echo "5. Click 'Add variable'"
+            echo ""
+            exit 1
+          fi
+
       - name: Generate app token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -21,5 +36,5 @@ jobs:
 
       - uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd # v2.0.0
         with:
-          project-url: https://github.com/orgs/datasciencecampus/projects/194
+          project-url: ${{ vars.GITHUB_PROJECT_URL }}
           github-token: ${{ steps.app-token.outputs.token }}
