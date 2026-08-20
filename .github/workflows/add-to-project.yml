@@ -20,7 +20,7 @@ jobs:
             echo "1. Go to: https://github.com/${{ github.repository }}/settings/variables"
             echo "2. Click 'New repository variable'"
             echo "3. Set Name: GITHUB_PROJECT_URL"
-            echo "4. Set Value: https://github.com/orgs/datasciencecampus/projects/194"
+            echo "4. Set Value: https://github.com/orgs/[ORG_NAME]/projects/[PROJECT_NUMBER]"
             echo "5. Click 'Add variable'"
             echo ""
             exit 1
