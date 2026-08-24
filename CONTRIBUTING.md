@@ -10,7 +10,7 @@ If you have a bug report, feature request, or suggestion, please [open an issue]
 - **Feature request** — uses a user story (`As a / I want / So that`) and Gherkin acceptance criteria (`Given / When / Then`) to define the scope clearly
 - **Question** — anything else
 
-Blank issues are disabled; all issues must use a template. Opened issues are automatically added to the project board. The maintainers may then invite you to contribute an implementation. Contributions outside of this process will be closed without review.
+Blank issues are disabled; all issues must use a template. Opened or reopened issues and pull requests are automatically routed to the project board. The maintainers may then invite you to contribute an implementation. Contributions outside of this process will be closed without review.
 
 ## Workflow
 
@@ -25,6 +25,15 @@ Blank issues are disabled; all issues must use a template. Opened issues are aut
 - If you have the GitHub Copilot code review feature enabled, request a Copilot review before requesting a human review.
 - Once Copilot review is complete (or if unavailable), request a human reviewer from the maintainer team.
 - A maintainer must approve the PR before it is merged.
+
+## Repository automation
+
+Project-routing workflows run automatically when issues or pull requests are opened or reopened. They dispatch reusable workflows from the `datasciencecampus/github-actions` repository to add items to the organisation project board.
+
+To keep these workflows working, configure the following repository settings:
+
+- `PROJECT_ROUTER_BOT_APP_ID` repository variable: the GitHub App client ID used to mint the dispatch token
+- `PROJECT_ROUTER_BOT_PEM` repository secret: the GitHub App private key in PEM format
 
 ## Code standards
 
