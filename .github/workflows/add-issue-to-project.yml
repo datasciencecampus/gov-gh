@@ -1,0 +1,49 @@
+name: Add Issue To Projects
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  add-issue-to-projects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App token for dispatch
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PROJECT_ROUTER_BOT_APP_ID }}
+          private-key: ${{ secrets.PROJECT_ROUTER_BOT_PEM }}
+          owner: datasciencecampus
+          repositories: github-actions
+          permission-actions: write
+
+      - name: Dispatch add-issue-to-projects workflow
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROJECT_FIELD_VALUES: '[{"project":194}]'
+          ISSUE_NODE_ID: ${{ github.event.issue.node_id }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          REF: ${{ github.ref_name }}
+        run: |
+          jq -n \
+            --arg ref "$REF" \
+            --arg repo "$REPOSITORY_NAME" \
+            --arg node_id "$ISSUE_NODE_ID" \
+            --arg project_field_values "$PROJECT_FIELD_VALUES" \
+            '{
+              ref: $ref,
+              inputs: {
+                repository: $repo,
+                issue_node_id: $node_id,
+                project_field_values: $project_field_values
+              }
+            }' | curl -sS -L --fail-with-body \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              https://api.github.com/repos/datasciencecampus/github-actions/actions/workflows/add-issue-to-projects.yml/dispatches \
+              -d @-

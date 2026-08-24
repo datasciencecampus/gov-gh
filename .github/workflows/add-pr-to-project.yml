@@ -1,0 +1,49 @@
+name: Add Pull Request To Projects
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  add-pr-to-projects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App token for dispatch
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PROJECT_ROUTER_BOT_APP_ID }}
+          private-key: ${{ secrets.PROJECT_ROUTER_BOT_PEM }}
+          owner: datasciencecampus
+          repositories: github-actions
+          permission-actions: write
+
+      - name: Dispatch add-pr-to-projects workflow
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROJECT_FIELD_VALUES: '[{"project":194,"field":"Status","value":"Review"}]'
+          PULL_REQUEST_NODE_ID: ${{ github.event.pull_request.node_id }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          REF: ${{ github.head_ref }}
+        run: |
+          jq -n \
+            --arg ref "$REF" \
+            --arg repo "$REPOSITORY_NAME" \
+            --arg node_id "$PULL_REQUEST_NODE_ID" \
+            --arg project_field_values "$PROJECT_FIELD_VALUES" \
+            '{
+              ref: $ref,
+              inputs: {
+                repository: $repo,
+                pull_request_node_id: $node_id,
+                project_field_values: $project_field_values
+              }
+            }' | curl -sS -L --fail-with-body \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              https://api.github.com/repos/datasciencecampus/github-actions/actions/workflows/add-pr-to-projects.yml/dispatches \
+              -d @-
