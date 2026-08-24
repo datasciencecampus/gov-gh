@@ -27,10 +27,10 @@ jobs:
           PROJECT_FIELD_VALUES: '[{"project":194,"field":"Status","value":"Review"}]'
           PULL_REQUEST_NODE_ID: ${{ github.event.pull_request.node_id }}
           REPOSITORY_NAME: ${{ github.event.repository.name }}
-          REF: ${{ github.head_ref }}
+          DISPATCH_REF: main
         run: |
           jq -n \
-            --arg ref "$REF" \
+            --arg ref "$DISPATCH_REF" \
             --arg repo "$REPOSITORY_NAME" \
             --arg node_id "$PULL_REQUEST_NODE_ID" \
             --arg project_field_values "$PROJECT_FIELD_VALUES" \

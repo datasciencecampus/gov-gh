@@ -27,10 +27,10 @@ jobs:
           PROJECT_FIELD_VALUES: '[{"project":194}]'
           ISSUE_NODE_ID: ${{ github.event.issue.node_id }}
           REPOSITORY_NAME: ${{ github.event.repository.name }}
-          REF: ${{ github.ref_name }}
+          DISPATCH_REF: main
         run: |
           jq -n \
-            --arg ref "$REF" \
+            --arg ref "$DISPATCH_REF" \
             --arg repo "$REPOSITORY_NAME" \
             --arg node_id "$ISSUE_NODE_ID" \
             --arg project_field_values "$PROJECT_FIELD_VALUES" \
