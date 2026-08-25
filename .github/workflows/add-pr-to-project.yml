@@ -15,4 +15,4 @@ jobs:
     with:
       repository: ${{ github.event.repository.name }}
       pull_request_node_id: ${{ github.event.pull_request.node_id }}
-      project_field_values: '[{"project":194,"field":"Status","value":"Review"}]'
+      project_field_values: ${{ format('[{{"project":{0},"field":"Status","value":"Review"}}]', vars.CLOUD_PROJECT_NUMBER) }}
