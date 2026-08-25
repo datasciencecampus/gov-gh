@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/datasciencecampus/gov-gh/compare/v0.2.1...v0.2.2) (2026-08-25)
+
+
+### Bug fixes
+
+* **workflows:** update action reference for add issue and pull request to projects workflows to v1.3.0 ([51b29dd](https://github.com/datasciencecampus/gov-gh/commit/51b29dd37ad9742e610f4bcff0b522ffae205035))
+* **workflows:** update action reference for add issue and pull request to projects workflows to v1.3.0 ([59751db](https://github.com/datasciencecampus/gov-gh/commit/59751db86f248514d64a20ad16ffac0a7f832fa3))
+
 ## [0.2.1](https://github.com/datasciencecampus/gov-gh/compare/v0.2.0...v0.2.1) (2026-08-24)
 
 
