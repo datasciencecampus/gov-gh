@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/datasciencecampus/gov-gh/compare/v0.3.0...v0.3.1) (2026-08-25)
+
+
+### Bug fixes
+
+* **workflows:** update project_field_values to use dynamic CLOUD_PROJECT_NUMBER for issue and pull request workflows ([5481669](https://github.com/datasciencecampus/gov-gh/commit/5481669b621c5133aa70f759f6c2f0d78a9f2bbd))
+
 ## [0.3.0](https://github.com/datasciencecampus/gov-gh/compare/v0.2.2...v0.3.0) (2026-08-25)
 
 
