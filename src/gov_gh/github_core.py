@@ -160,9 +160,7 @@ def paginate_connection[T](
     node_key: str = "nodes",
     page_size: int = 50,
     transform: Callable[[dict[str, Any]], T] = (lambda x: x),
-    filter: Callable[[dict[str, Any]], bool] = (
-        lambda _node: True
-    ),
+    filter: Callable[[dict[str, Any]], bool] = (lambda _node: True),
 ) -> Iterator[T]:
     """Helper to paginate through a GraphQL connection.
     Args:

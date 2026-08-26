@@ -78,9 +78,10 @@ class TestGetGraphqlClient:
         """_get_graphql_client should return a gql Client without hitting the network."""
         from gql import Client
 
-        with patch(
-            "gov_gh.github_core.RequestsHTTPTransport"
-        ) as mock_transport_cls, patch("gov_gh.github_core.Client") as mock_client_cls:
+        with (
+            patch("gov_gh.github_core.RequestsHTTPTransport") as mock_transport_cls,
+            patch("gov_gh.github_core.Client") as mock_client_cls,
+        ):
             mock_transport_cls.return_value = MagicMock()
             mock_client_cls.return_value = MagicMock(spec=Client)
             client = _get_graphql_client(token)
@@ -88,9 +89,10 @@ class TestGetGraphqlClient:
 
     def test_transport_receives_auth_headers(self, token: SecretStr) -> None:
         """The transport must be constructed with the correct auth headers."""
-        with patch(
-            "gov_gh.github_core.RequestsHTTPTransport"
-        ) as mock_transport_cls, patch("gov_gh.github_core.Client"):
+        with (
+            patch("gov_gh.github_core.RequestsHTTPTransport") as mock_transport_cls,
+            patch("gov_gh.github_core.Client"),
+        ):
             _get_graphql_client(token)
             _, kwargs = mock_transport_cls.call_args
             assert "headers" in kwargs
@@ -162,9 +164,7 @@ class TestExecuteGraphqlQuery:
         """Should raise after exhausting all retries."""
         mock_client.execute.side_effect = ConnectionError("timeout")
         with patch("gov_gh.github_core.sleep"), pytest.raises(ConnectionError):
-            _execute_graphql_query(
-                mock_client, MagicMock(), {}, logger, max_retries=2
-            )
+            _execute_graphql_query(mock_client, MagicMock(), {}, logger, max_retries=2)
 
     def test_raises_immediately_on_non_retriable_error(
         self, mock_client: MagicMock, logger: logging.Logger
@@ -186,9 +186,7 @@ class TestExecuteGraphqlQuery:
             {"ok": True},
         ]
         with patch("gov_gh.github_core.sleep") as mock_sleep:
-            _execute_graphql_query(
-                mock_client, MagicMock(), {}, logger, max_retries=4
-            )
+            _execute_graphql_query(mock_client, MagicMock(), {}, logger, max_retries=4)
         assert mock_sleep.call_args_list == [call(1), call(2), call(4)]
 
 
@@ -241,9 +239,7 @@ class TestGetConnectionData:
         data = _get_connection_data(connection, logger)
         assert data == ["x", "y"]
 
-    def test_raises_when_neither_edges_nor_nodes(
-        self, logger: logging.Logger
-    ) -> None:
+    def test_raises_when_neither_edges_nor_nodes(self, logger: logging.Logger) -> None:
         """Should raise GraphQLResponseError when the connection has no data key."""
         with pytest.raises(GraphQLResponseError):
             _get_connection_data({}, logger)
@@ -264,9 +260,7 @@ class TestGetConnectionData:
 # ---------------------------------------------------------------------------
 
 
-def _make_page(
-    items: list, has_next: bool, end_cursor: str | None = None
-) -> dict:
+def _make_page(items: list, has_next: bool, end_cursor: str | None = None) -> dict:
     """Build a minimal GraphQL page response for tests."""
     return {
         "org": {
@@ -286,10 +280,13 @@ class TestPaginateConnection:
         mock_client.execute.return_value = _make_page(
             [{"name": "repo1"}, {"name": "repo2"}], has_next=False
         )
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query",
-            return_value=_make_page(
-                [{"name": "repo1"}, {"name": "repo2"}], has_next=False
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch(
+                "gov_gh.github_core._execute_graphql_query",
+                return_value=_make_page(
+                    [{"name": "repo1"}, {"name": "repo2"}], has_next=False
+                ),
             ),
         ):
             items = list(
@@ -307,8 +304,9 @@ class TestPaginateConnection:
             _make_page([{"name": "a"}], has_next=True, end_cursor="cur1"),
             _make_page([{"name": "b"}], has_next=False),
         ]
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query", side_effect=pages
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch("gov_gh.github_core._execute_graphql_query", side_effect=pages),
         ):
             items = list(
                 paginate_connection(
@@ -321,9 +319,12 @@ class TestPaginateConnection:
         self, mock_client: MagicMock, logger: logging.Logger
     ) -> None:
         """The transform callable should be applied to every yielded node."""
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query",
-            return_value=_make_page([{"name": "repo1"}], has_next=False),
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch(
+                "gov_gh.github_core._execute_graphql_query",
+                return_value=_make_page([{"name": "repo1"}], has_next=False),
+            ),
         ):
             items = list(
                 paginate_connection(
@@ -341,10 +342,13 @@ class TestPaginateConnection:
         self, mock_client: MagicMock, logger: logging.Logger
     ) -> None:
         """The filter predicate should exclude non-matching nodes."""
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query",
-            return_value=_make_page(
-                [{"name": "keep"}, {"name": "drop"}], has_next=False
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch(
+                "gov_gh.github_core._execute_graphql_query",
+                return_value=_make_page(
+                    [{"name": "keep"}, {"name": "drop"}], has_next=False
+                ),
             ),
         ):
             items = list(
@@ -364,9 +368,11 @@ class TestPaginateConnection:
     ) -> None:
         """Should raise GraphQLResponseError when pageInfo is absent."""
         response = {"org": {"repos": {"nodes": []}}}  # no pageInfo
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query", return_value=response
-        ), pytest.raises(GraphQLResponseError):
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch("gov_gh.github_core._execute_graphql_query", return_value=response),
+            pytest.raises(GraphQLResponseError),
+        ):
             list(
                 paginate_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
@@ -381,9 +387,12 @@ class TestPaginateConnection:
             _make_page([{"name": "a"}], has_next=True, end_cursor="abc"),
             _make_page([{"name": "b"}], has_next=False),
         ]
-        with patch("gov_gh.github_core.gql"), patch(
-            "gov_gh.github_core._execute_graphql_query", side_effect=pages
-        ) as mock_execute:
+        with (
+            patch("gov_gh.github_core.gql"),
+            patch(
+                "gov_gh.github_core._execute_graphql_query", side_effect=pages
+            ) as mock_execute,
+        ):
             list(
                 paginate_connection(
                     mock_client, "query {}", {"org": "myorg"}, logger, ["org", "repos"]
