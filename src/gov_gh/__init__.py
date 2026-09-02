@@ -1,11 +1,10 @@
-"""gov-gh: Python SDK for the GitHub REST and GraphQL APIs."""
+"""gov-gh: Python SDK for the GitHub GraphQL API."""
 
 from importlib.metadata import PackageNotFoundError, version
 
 from gov_gh.client import GitHubClient
 from gov_gh.graphql import GraphQLClient
 from gov_gh.models import GraphQLConnection, GraphQLPageInfo, GraphQLVariables
-from gov_gh.rest import RESTClient
 
 try:
     __version__ = version("gov-gh")
@@ -18,6 +17,5 @@ __all__ = [
     "GraphQLConnection",
     "GraphQLPageInfo",
     "GraphQLVariables",
-    "RESTClient",
     "__version__",
 ]

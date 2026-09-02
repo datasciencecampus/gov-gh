@@ -15,7 +15,6 @@ authors = [
 dependencies = [
     "gql[requests]>=4.0.0",
     "pydantic>=2.13.4",
-    "requests>=2.32.0",
 ]
 
 [dependency-groups]

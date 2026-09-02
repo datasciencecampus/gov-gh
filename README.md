@@ -1,6 +1,6 @@
 # gov-gh
 
-> Python SDK for GitHub REST and GraphQL APIs, built for government organisations.
+> Python SDK for GitHub APIs, built for government organisations.
 > [!WARNING]
 > This project is in early development. The API is not stable and the package is not yet available on PyPI.
 
@@ -8,7 +8,9 @@
 
 ## About
 
-Managing GitHub organisations at scale requires consistent, repeatable tooling. `gov-gh` wraps the GitHub REST and GraphQL APIs into a clean Python interface, covering:
+Managing GitHub organisations at scale requires consistent, repeatable tooling.
+The current pre-release implementation provides a typed GraphQL client; REST API
+support is planned for a future release.
 
 - **Organisation administration** — governance policies, settings, and org-wide operations
 - **Repository management** — create, configure, and govern repositories
@@ -24,10 +26,10 @@ gov-gh/
 │   └── gov_gh/
 │       ├── __init__.py          # Package exports and version information
 │       ├── auth.py              # Shared authentication headers
-│       ├── client.py            # Top-level REST and GraphQL facade
+│       ├── client.py            # Top-level GraphQL facade
 │       ├── exceptions.py        # Package-specific exceptions
 │       ├── graphql.py           # GraphQL execution and pagination
-│       ├── rest.py              # REST request handling
+│       ├── rest.py              # Placeholder for future REST support
 │       └── retry.py             # Shared retry policy
 ```
 
@@ -60,8 +62,7 @@ See [configs/](configs/) for available configuration options.
 
 ## Usage
 
-Create one client to share authentication and retry settings between REST and
-GraphQL requests:
+Create a client with shared GraphQL authentication and retry settings:
 
 ```python
 import os
@@ -84,14 +85,13 @@ class ViewerResult(BaseModel):
     viewer: Viewer
 
 
-with GitHubClient(os.environ["GITHUB_TOKEN"]) as github:
-    repositories = github.rest.request("GET", "/orgs/datasciencecampus/repos")
-    viewer = github.graphql.execute(
-        "query($include_name: Boolean!) { "
-        "viewer { login name @include(if: $include_name) } }",
-        ViewerVariables(include_name=True),
-        result_model=ViewerResult,
-    )
+github = GitHubClient(os.environ["GITHUB_TOKEN"])
+viewer = github.graphql.execute(
+    "query($include_name: Boolean!) { "
+    "viewer { login name @include(if: $include_name) } }",
+    ViewerVariables(include_name=True),
+    result_model=ViewerResult,
+)
 ```
 
 GraphQL variables and results cross the public API as validated Pydantic models.

@@ -6,7 +6,6 @@ from gov_gh import (
     GraphQLConnection,
     GraphQLPageInfo,
     GraphQLVariables,
-    RESTClient,
     __version__,
 )
 
@@ -23,4 +22,3 @@ def test_public_classes_are_importable() -> None:
     assert GraphQLConnection.__name__ == "GraphQLConnection"
     assert GraphQLPageInfo.__name__ == "GraphQLPageInfo"
     assert GraphQLVariables.__name__ == "GraphQLVariables"
-    assert RESTClient.__name__ == "RESTClient"
