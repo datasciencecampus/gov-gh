@@ -1,0 +1,18 @@
+name: Add Issue To Projects
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  add-issue-to-projects:
+    uses: datasciencecampus/github-actions/.github/workflows/add-issue-to-projects.yml@aacc6cca7266747b0565ac39673d96998c094312 # v1.3.0
+    secrets:
+      PROJECT_ROUTER_BOT_PRIVATE_KEY: ${{ secrets.PROJECT_ROUTER_BOT_PRIVATE_KEY }}
+    with:
+      repository: ${{ github.event.repository.name }}
+      issue_node_id: ${{ github.event.issue.node_id }}
+      project_field_values: ${{ format('[{{"project":{0}}}]', vars.CLOUD_PROJECT_NUMBER) }}

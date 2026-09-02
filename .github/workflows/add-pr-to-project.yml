@@ -1,0 +1,18 @@
+name: Add Pull Request To Projects
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  add-pr-to-projects:
+    uses: datasciencecampus/github-actions/.github/workflows/add-pr-to-projects.yml@aacc6cca7266747b0565ac39673d96998c094312 # v1.3.0
+    secrets:
+      PROJECT_ROUTER_BOT_PRIVATE_KEY: ${{ secrets.PROJECT_ROUTER_BOT_PRIVATE_KEY }}
+    with:
+      repository: ${{ github.event.repository.name }}
+      pull_request_node_id: ${{ github.event.pull_request.node_id }}
+      project_field_values: ${{ format('[{{"project":{0},"field":"Status","value":"Review"}}]', vars.CLOUD_PROJECT_NUMBER) }}

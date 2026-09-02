@@ -1,0 +1,36 @@
+name: GitHub Actions Security Analysis with zizmor 🌈
+run-name: ${{ github.workflow }} - ${{ github.actor }} pushed a change to ${{ github.ref_name }}
+
+'on':
+  workflow_call:
+    inputs:
+      config-path:
+        description: Path to the zizmor config file.
+        required: false
+        type: string
+        default: ./configs/zizmor.yaml
+      advanced-security:
+        description: Upload SARIF results to GitHub Advanced Security.
+        required: false
+        type: boolean
+        default: false
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    name: Zizmor
+    uses: ONSdigital/ons-github-actions/.github/workflows/zizmor.yml@30b446248fe241447bdef1b1818991f6ea933769 #v1.1.0
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      config-path: ${{ inputs.config-path || './configs/zizmor.yaml' }}
+      advanced-security: ${{ inputs.advanced-security || false }}
