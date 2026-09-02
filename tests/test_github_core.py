@@ -19,7 +19,6 @@ from gov_gh.github_core import (
     paginate_connection,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -75,7 +74,8 @@ class TestGetAuthHeaders:
 
 class TestGetGraphqlClient:
     def test_returns_client_instance(self, token: SecretStr) -> None:
-        """_get_graphql_client should return a gql Client without hitting the network."""
+        """_get_graphql_client should return a gql Client without hitting the
+        network."""
         from gql import Client
 
         with (

@@ -1,11 +1,13 @@
-from pydantic import SecretStr
 from collections.abc import Callable, Iterator
-from typing import Any, cast
+from logging import Logger
 from time import sleep
+from typing import Any
+
 from gql import Client, gql
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
-from logging import Logger
+from pydantic import SecretStr
+
 from gov_gh.exceptions import GraphQLResponseError
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
@@ -65,7 +67,8 @@ def _execute_graphql_query(
     Returns:
         Dict[str, Any]: The result of the GraphQL query execution.
     Raises:
-        Exception: If the query fails after the maximum number of retries or a non-retriable error occurs.
+        Exception: If the query fails after the maximum number of retries or a
+            non-retriable error occurs.
     """
     attempt = 0
     while True:
@@ -78,7 +81,8 @@ def _execute_graphql_query(
                     attempt += 1
                     backoff = 2 ** (attempt - 1)
                     logger.warning(
-                        "GraphQL query attempt %d/%d failed with retriable error %s. Retrying in %d seconds...",
+                        "GraphQL query attempt %d/%d failed with retriable "
+                        "error %s. Retrying in %d seconds...",
                         attempt,
                         max_retries,
                         e,
@@ -168,11 +172,14 @@ def paginate_connection[T](
         query_str: GraphQL query string with $org and $cursor variables.
         variables: Variables for the GraphQL query.
         logger: Logger instance for logging pagination progress.
-        connection_path: Path to the connection field in the GraphQL response (e.g. ["organization", "repositories"]).
+        connection_path: Path to the connection field in the GraphQL response
+            (e.g. ["organization", "repositories"]).
         node_key: Key for the nodes in the connection (default is "nodes").
         page_size: Number of items per page (default is 50).
-        transform: Optional function to transform raw node or edge dicts before yielding (default is identity).
-        filter: Optional predicate to filter raw node or edge dicts before transformation/yielding (default yields all).
+        transform: Optional function to transform raw node or edge dicts before
+            yielding (default is identity).
+        filter: Optional predicate to filter raw node or edge dicts before
+            transformation/yielding (default yields all).
     Yields:
         T: Transformed node from the connection.
     """
@@ -197,7 +204,8 @@ def paginate_connection[T](
             page_index += 1
         else:
             logger.info(
-                "Pagination complete after %d pages, %d total items for connection path: %s (page_size: %d)",
+                "Pagination complete after %d pages, %d total items for "
+                "connection path: %s (page_size: %d)",
                 page_index + 1,
                 page_index * page_size + len(data),
                 connection_path,
