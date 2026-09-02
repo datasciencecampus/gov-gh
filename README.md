@@ -98,6 +98,10 @@ GraphQL variables and results cross the public API as validated Pydantic models.
 Use `github.graphql.paginate(...)` with `GraphQLConnection` for connections that
 expose `nodes` or `edges` and `pageInfo`.
 
+Queries retry transient failures according to the configured retry policy. Mutations
+are not retried by default because repeating one may duplicate a completed action.
+Pass `retry_mutations=True` only for a mutation known to be safe to repeat.
+
 ## Development
 
 Requires Python >= 3.12 and [`uv`](https://docs.astral.sh/uv/).

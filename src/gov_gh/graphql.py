@@ -4,9 +4,10 @@ from collections.abc import Callable, Iterator
 from http import HTTPStatus
 from logging import Logger, getLogger
 
-from gql import Client, gql
+from gql import Client, GraphQLRequest, gql
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
+from graphql import OperationDefinitionNode
 from pydantic import BaseModel, ValidationError
 
 from gov_gh.auth import GitHubAuth
@@ -52,13 +53,18 @@ class GraphQLClient:
         variables: GraphQLVariables | None,
         *,
         result_model: type[ResultT],
+        operation_name: str | None = None,
+        retry_mutations: bool = False,
     ) -> ResultT:
-        """Execute a GraphQL query with retry handling.
+        """Execute a GraphQL operation with safe retry handling.
 
         Args:
             query: GraphQL query or mutation document.
             variables: Validated variables referenced by the document.
             result_model: Pydantic model used to validate the response data.
+            operation_name: Operation to execute when the document contains several.
+            retry_mutations: Whether transient mutation failures may be retried. Set
+                this only when repeating the mutation is known to be safe.
 
         Returns:
             The validated GraphQL response model.
@@ -67,7 +73,7 @@ class GraphQLClient:
             gql.transport.exceptions.TransportError: If execution fails.
             pydantic.ValidationError: If the response does not match the model.
         """
-        document = gql(query)
+        request = gql(query)
         variable_values = (
             variables.model_dump(mode="json", by_alias=True)
             if variables is not None
@@ -75,11 +81,21 @@ class GraphQLClient:
         )
 
         def send() -> ResultT:
-            result = self._client.execute(document, variable_values=variable_values)
+            result = self._client.execute(
+                request,
+                variable_values=variable_values,
+                operation_name=operation_name,
+            )
             return result_model.model_validate(result)
 
+        is_mutation = self._is_mutation(request, operation_name)
+        should_retry = (
+            self._is_retriable
+            if not is_mutation or retry_mutations
+            else lambda _error: False
+        )
         return self._retry_policy.execute(
-            send, self._is_retriable, self._logger, "GraphQL query"
+            send, should_retry, self._logger, "GraphQL operation"
         )
 
     def paginate[PageT: BaseModel, ItemT: BaseModel](
@@ -138,3 +154,20 @@ class GraphQLClient:
         if isinstance(error, TransportServerError):
             return error.code in RETRIABLE_STATUS_CODES
         return True
+
+    @staticmethod
+    def _is_mutation(request: GraphQLRequest, operation_name: str | None) -> bool:
+        operations = [
+            definition
+            for definition in request.document.definitions
+            if isinstance(definition, OperationDefinitionNode)
+        ]
+        if operation_name is not None:
+            selected_operations = [
+                operation
+                for operation in operations
+                if operation.name is not None and operation.name.value == operation_name
+            ]
+            if selected_operations:
+                operations = selected_operations
+        return any(operation.operation.value == "mutation" for operation in operations)
