@@ -310,11 +310,12 @@ wheels = [
 
 [[package]]
 name = "gov-gh"
-version = "0.3.1"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "gql", extra = ["requests"] },
     { name = "pydantic" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -329,6 +330,7 @@ dev = [
 requires-dist = [
     { name = "gql", extras = ["requests"], specifier = ">=4.0.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "requests", specifier = ">=2.32.0" },
 ]
 
 [package.metadata.requires-dev]
