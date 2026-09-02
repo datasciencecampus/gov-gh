@@ -12,7 +12,10 @@ license = { text = "MIT" }
 authors = [
   { name = "Office for National Statistics" }
 ]
-dependencies = []
+dependencies = [
+    "gql[requests]>=4.0.0",
+    "pydantic>=2.13.4",
+]
 
 [dependency-groups]
 dev = [
