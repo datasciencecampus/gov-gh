@@ -74,8 +74,7 @@ class TestGetAuthHeaders:
 
 class TestGetGraphqlClient:
     def test_returns_client_instance(self, token: SecretStr) -> None:
-        """_get_graphql_client should return a gql Client without hitting the
-        network."""
+        """Return a gql Client without contacting the network."""
         from gql import Client
 
         with (
