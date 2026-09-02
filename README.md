@@ -1,6 +1,6 @@
 # gov-gh
 
-> Python SDK for GitHub APIs, built for government organisations.
+> Python SDK for GitHub REST and GraphQL APIs, built for government organisations.
 > [!WARNING]
 > This project is in early development. The API is not stable and the package is not yet available on PyPI.
 
@@ -8,9 +8,7 @@
 
 ## About
 
-Managing GitHub organisations at scale requires consistent, repeatable tooling.
-The current pre-release implementation provides a typed GraphQL client; REST API
-support is planned for a future release.
+Managing GitHub organisations at scale requires consistent, repeatable tooling. `gov-gh` wraps the GitHub REST and GraphQL APIs into a clean Python interface, covering:
 
 - **Organisation administration** — governance policies, settings, and org-wide operations
 - **Repository management** — create, configure, and govern repositories
@@ -59,48 +57,6 @@ export GITHUB_TOKEN="ghp_..."
 ```
 
 See [configs/](configs/) for available configuration options.
-
-## Usage
-
-Create a client with shared GraphQL authentication and retry settings:
-
-```python
-import os
-
-from pydantic import BaseModel
-
-from gov_gh import GitHubClient, GraphQLVariables
-
-
-class ViewerVariables(GraphQLVariables):
-    include_name: bool = True
-
-
-class Viewer(BaseModel):
-    login: str
-    name: str | None
-
-
-class ViewerResult(BaseModel):
-    viewer: Viewer
-
-
-github = GitHubClient(os.environ["GITHUB_TOKEN"])
-viewer = github.graphql.execute(
-    "query($include_name: Boolean!) { "
-    "viewer { login name @include(if: $include_name) } }",
-    ViewerVariables(include_name=True),
-    result_model=ViewerResult,
-)
-```
-
-GraphQL variables and results cross the public API as validated Pydantic models.
-Use `github.graphql.paginate(...)` with `GraphQLConnection` for connections that
-expose `nodes` or `edges` and `pageInfo`.
-
-Queries retry transient failures according to the configured retry policy. Mutations
-are not retried by default because repeating one may duplicate a completed action.
-Pass `retry_mutations=True` only for a mutation known to be safe to repeat.
 
 ## Development
 
