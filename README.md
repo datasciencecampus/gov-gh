@@ -66,15 +66,37 @@ GraphQL requests:
 ```python
 import os
 
-from gov_gh import GitHubClient
+from pydantic import BaseModel
+
+from gov_gh import GitHubClient, GraphQLVariables
+
+
+class ViewerVariables(GraphQLVariables):
+    include_name: bool = True
+
+
+class Viewer(BaseModel):
+    login: str
+    name: str | None
+
+
+class ViewerResult(BaseModel):
+    viewer: Viewer
+
 
 with GitHubClient(os.environ["GITHUB_TOKEN"]) as github:
     repositories = github.rest.request("GET", "/orgs/datasciencecampus/repos")
-    viewer = github.graphql.execute("query { viewer { login } }")
+    viewer = github.graphql.execute(
+        "query($include_name: Boolean!) { "
+        "viewer { login name @include(if: $include_name) } }",
+        ViewerVariables(include_name=True),
+        result_model=ViewerResult,
+    )
 ```
 
-Use `github.graphql.paginate(...)` for GraphQL connections that expose
-`nodes` or `edges` and `pageInfo`.
+GraphQL variables and results cross the public API as validated Pydantic models.
+Use `github.graphql.paginate(...)` with `GraphQLConnection` for connections that
+expose `nodes` or `edges` and `pageInfo`.
 
 ## Development
 

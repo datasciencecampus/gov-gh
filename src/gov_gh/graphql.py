@@ -3,14 +3,14 @@
 from collections.abc import Callable, Iterator
 from http import HTTPStatus
 from logging import Logger, getLogger
-from typing import Any
 
 from gql import Client, gql
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
+from pydantic import BaseModel, ValidationError
 
 from gov_gh.auth import GitHubAuth
-from gov_gh.exceptions import GraphQLResponseError
+from gov_gh.models import GraphQLConnection, GraphQLVariables
 from gov_gh.retry import RetryPolicy
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
@@ -46,77 +46,80 @@ class GraphQLClient:
         self._retry_policy = retry_policy or RetryPolicy()
         self._client = client or self._create_client(auth)
 
-    def execute(
-        self, query: str, variables: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    def execute[ResultT: BaseModel](
+        self,
+        query: str,
+        variables: GraphQLVariables | None,
+        *,
+        result_model: type[ResultT],
+    ) -> ResultT:
         """Execute a GraphQL query with retry handling.
 
         Args:
             query: GraphQL query or mutation document.
-            variables: Optional variables referenced by the document.
+            variables: Validated variables referenced by the document.
+            result_model: Pydantic model used to validate the response data.
 
         Returns:
-            The decoded GraphQL response data.
+            The validated GraphQL response model.
 
         Raises:
             gql.transport.exceptions.TransportError: If execution fails.
+            pydantic.ValidationError: If the response does not match the model.
         """
         document = gql(query)
+        variable_values = (
+            variables.model_dump(mode="json", by_alias=True)
+            if variables is not None
+            else {}
+        )
 
-        def send() -> dict[str, Any]:
-            result: dict[str, Any] = self._client.execute(
-                document, variable_values=variables or {}
-            )
-            return result
+        def send() -> ResultT:
+            result = self._client.execute(document, variable_values=variable_values)
+            return result_model.model_validate(result)
 
         return self._retry_policy.execute(
             send, self._is_retriable, self._logger, "GraphQL query"
         )
 
-    def paginate[T](
+    def paginate[PageT: BaseModel, ItemT: BaseModel](
         self,
         query: str,
-        variables: dict[str, Any],
-        connection_path: list[str],
+        variables: GraphQLVariables,
         *,
-        transform: Callable[[dict[str, Any]], T] = lambda item: item,
-        predicate: Callable[[dict[str, Any]], bool] = lambda _item: True,
-    ) -> Iterator[T]:
+        result_model: type[PageT],
+        get_connection: Callable[[PageT], GraphQLConnection[ItemT]],
+        predicate: Callable[[ItemT], bool] = lambda _item: True,
+    ) -> Iterator[ItemT]:
         """Yield all items from a cursor-based GraphQL connection.
 
         Args:
             query: Query containing a ``$cursor`` variable.
-            variables: Query variables other than the cursor.
-            connection_path: Keys leading to the connection in each response.
-            transform: Function applied to each item before it is yielded.
+            variables: Validated query variables, including a cursor field.
+            result_model: Pydantic model used to validate each response page.
+            get_connection: Function selecting the connection from a response page.
             predicate: Function selecting which items to yield.
 
         Yields:
-            Items from every page after filtering and transformation.
+            Validated items from every page after filtering.
 
         Raises:
-            GraphQLResponseError: If a response has an invalid connection shape.
+            pydantic.ValidationError: If variables or a response page are invalid.
         """
         cursor: str | None = None
         while True:
-            result = self.execute(query, variables | {"cursor": cursor})
-            connection = _get_connection(result, connection_path)
-            for item in _get_connection_data(connection):
+            page_variables = type(variables).model_validate(
+                variables.model_dump() | {"cursor": cursor}
+            )
+            result = self.execute(query, page_variables, result_model=result_model)
+            connection = get_connection(result)
+            for item in connection.items:
                 if predicate(item):
-                    yield transform(item)
+                    yield item
 
-            page_info = connection.get("pageInfo")
-            if not isinstance(page_info, dict):
-                raise GraphQLResponseError(
-                    f"Unexpected response: {connection_path} pageInfo is missing"
-                )
-            if not page_info.get("hasNextPage"):
+            if not connection.page_info.has_next_page:
                 return
-            cursor = page_info.get("endCursor")
-            if not isinstance(cursor, str) or not cursor:
-                raise GraphQLResponseError(
-                    "Unexpected response: endCursor is missing for the next page"
-                )
+            cursor = connection.page_info.end_cursor
 
     @staticmethod
     def _create_client(auth: GitHubAuth) -> Client:
@@ -130,37 +133,8 @@ class GraphQLClient:
 
     @staticmethod
     def _is_retriable(error: Exception) -> bool:
-        if isinstance(error, TransportQueryError):
+        if isinstance(error, (TransportQueryError, ValidationError)):
             return False
         if isinstance(error, TransportServerError):
             return error.code in RETRIABLE_STATUS_CODES
         return True
-
-
-def _get_connection(
-    result: dict[str, Any], connection_path: list[str]
-) -> dict[str, Any]:
-    connection = result
-    for key in connection_path:
-        value = connection.get(key)
-        if not isinstance(value, dict):
-            raise GraphQLResponseError(
-                f"Unexpected response: {key} is missing or is not an object"
-            )
-        connection = value
-    return connection
-
-
-def _get_connection_data(connection: dict[str, Any]) -> list[dict[str, Any]]:
-    data = connection.get("edges")
-    if data is None:
-        data = connection.get("nodes")
-    if not isinstance(data, list):
-        raise GraphQLResponseError(
-            "Unexpected response: edges or nodes must contain a list"
-        )
-    if not all(isinstance(item, dict) for item in data):
-        raise GraphQLResponseError(
-            "Unexpected response: connection items must be objects"
-        )
-    return data

@@ -1,6 +1,14 @@
 """Tests for the package's public imports."""
 
-from gov_gh import GitHubClient, GraphQLClient, RESTClient, __version__
+from gov_gh import (
+    GitHubClient,
+    GraphQLClient,
+    GraphQLConnection,
+    GraphQLPageInfo,
+    GraphQLVariables,
+    RESTClient,
+    __version__,
+)
 
 
 def test_version_is_string() -> None:
@@ -8,8 +16,11 @@ def test_version_is_string() -> None:
     assert isinstance(__version__, str)
 
 
-def test_public_clients_are_importable() -> None:
-    """All supported client classes should be exported at package level."""
+def test_public_classes_are_importable() -> None:
+    """All supported client and model classes should be package exports."""
     assert GitHubClient.__name__ == "GitHubClient"
     assert GraphQLClient.__name__ == "GraphQLClient"
+    assert GraphQLConnection.__name__ == "GraphQLConnection"
+    assert GraphQLPageInfo.__name__ == "GraphQLPageInfo"
+    assert GraphQLVariables.__name__ == "GraphQLVariables"
     assert RESTClient.__name__ == "RESTClient"
