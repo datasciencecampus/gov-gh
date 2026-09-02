@@ -17,10 +17,10 @@ from gov_gh.retry import RetryPolicy
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 RETRIABLE_STATUS_CODES = frozenset(
     {
-        HTTPStatus.INTERNAL_SERVER_ERROR,
-        HTTPStatus.BAD_GATEWAY,
-        HTTPStatus.SERVICE_UNAVAILABLE,
-        HTTPStatus.GATEWAY_TIMEOUT,
+        HTTPStatus.INTERNAL_SERVER_ERROR,  # 500
+        HTTPStatus.BAD_GATEWAY,  # 502
+        HTTPStatus.SERVICE_UNAVAILABLE,  # 503
+        HTTPStatus.GATEWAY_TIMEOUT,  # 504
     }
 )
 
