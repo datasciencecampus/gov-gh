@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/datasciencecampus/gov-gh/compare/v0.3.1...v0.4.0) (2026-09-02)
+
+
+### Features
+
+* Implement Paginate Connection ([7d2f5ac](https://github.com/datasciencecampus/gov-gh/commit/7d2f5ac699311e8007458c55d9f1d53fd2ee4645))
+
+
+### Documentation
+
+* add module docstring to exceptions ([bdd30fd](https://github.com/datasciencecampus/gov-gh/commit/bdd30fd2699cd78c3d7ff83c9e57c0637caa21c8))
+
+
+### Refactoring
+
+* Refactor imports and improve docstring formatting for ruff check consistency ([87dc944](https://github.com/datasciencecampus/gov-gh/commit/87dc94493e6b976dc466215e78ec28cba449939d))
+* Simplify docstring for test_returns_client_instance in TestGetGraphqlClient ([0f8e3d6](https://github.com/datasciencecampus/gov-gh/commit/0f8e3d613aad082963c965e61c8cac55a5621a0f))
+* Update retriable error handling to use HTTPStatus constants ([aad7beb](https://github.com/datasciencecampus/gov-gh/commit/aad7bebd46eb77b23bdd089e1efa83589b64cc9f))
+
 ## [0.3.1](https://github.com/datasciencecampus/gov-gh/compare/v0.3.0...v0.3.1) (2026-08-25)
 
 
