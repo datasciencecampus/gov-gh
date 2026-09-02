@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator
+from http import HTTPStatus
 from logging import Logger
 from time import sleep
 from typing import Any
@@ -11,6 +12,15 @@ from pydantic import SecretStr
 from gov_gh.exceptions import GraphQLResponseError
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
+
+RETRIABLE_HTTP_STATUS_CODES: frozenset[HTTPStatus] = frozenset(
+    {
+        HTTPStatus.INTERNAL_SERVER_ERROR,  # 500
+        HTTPStatus.BAD_GATEWAY,  # 502
+        HTTPStatus.SERVICE_UNAVAILABLE,  # 503
+        HTTPStatus.GATEWAY_TIMEOUT,  # 504
+    }
+)
 
 
 def _get_auth_headers(token: SecretStr) -> dict:
@@ -46,7 +56,7 @@ def _is_retriable(error: Exception) -> bool:
     if isinstance(
         error, TransportServerError
     ):  # HTTP Level Errors 404, 403 should not be retried, but some 5xx may
-        return error.code in (500, 502, 503, 504)
+        return error.code in RETRIABLE_HTTP_STATUS_CODES
     return True
 
 

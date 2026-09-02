@@ -2,6 +2,7 @@
 retry logic, connection extraction, and cursor-based pagination."""
 
 import logging
+from http import HTTPStatus
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -108,14 +109,29 @@ class TestIsRetriable:
         """TransportQueryError (e.g. 403 / syntax) must not be retried."""
         assert _is_retriable(TransportQueryError("forbidden")) is False
 
-    @pytest.mark.parametrize("code", [500, 502, 503, 504])
-    def test_retriable_server_error_codes(self, code: int) -> None:
+    @pytest.mark.parametrize(
+        "code",
+        [
+            HTTPStatus.INTERNAL_SERVER_ERROR,  # 500
+            HTTPStatus.BAD_GATEWAY,  # 502
+            HTTPStatus.SERVICE_UNAVAILABLE,  # 503
+            HTTPStatus.GATEWAY_TIMEOUT,  # 504
+        ],
+    )
+    def test_retriable_server_error_codes(self, code: HTTPStatus) -> None:
         """5xx transient HTTP errors should be retried."""
         err = TransportServerError(f"server error {code}", code=code)
         assert _is_retriable(err) is True
 
-    @pytest.mark.parametrize("code", [400, 403, 404])
-    def test_non_retriable_server_error_codes(self, code: int) -> None:
+    @pytest.mark.parametrize(
+        "code",
+        [
+            HTTPStatus.BAD_REQUEST,  # 400
+            HTTPStatus.FORBIDDEN,  # 403
+            HTTPStatus.NOT_FOUND,  # 404
+        ],
+    )
+    def test_non_retriable_server_error_codes(self, code: HTTPStatus) -> None:
         """Client-side HTTP errors (4xx) must not be retried."""
         err = TransportServerError(f"client error {code}", code=code)
         assert _is_retriable(err) is False
