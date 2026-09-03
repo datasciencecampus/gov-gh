@@ -1,7 +1,6 @@
 # gov-gh
 
 > Python SDK for GitHub REST and GraphQL APIs, built for government organisations.
-
 > [!WARNING]
 > This project is in early development. The API is not stable and the package is not yet available on PyPI.
 
@@ -17,22 +16,19 @@ Managing GitHub organisations at scale requires consistent, repeatable tooling. 
 - **Issue operations** — create, retrieve, update, and close issues programmatically
 - **Workflow automation** — scripted operations suitable for CI/CD pipelines and scheduled tasks
 
-## Planned package structure
+## Package structure
 
-The following structure reflects the intended design of the package. Not all modules are implemented yet.
-
-```
+```text
 gov-gh/
 ├── src/
 │   └── gov_gh/
 │       ├── __init__.py          # Package exports and version information
-│       ├── client.py            # GitHub API client and authentication handling
-│       ├── config.py            # Configuration settings and environment variables
-│       ├── issues.py            # Create, retrieve, update and manage issues
-│       ├── members.py           # Manage organisation members, teams and permissions
-│       ├── models.py            # Shared Pydantic models for API data objects
-│       ├── organisation.py      # Organisation-wide administration, governance and policy
-│       └── repositories.py      # Repository management operations
+│       ├── auth.py              # Shared authentication headers
+│       ├── client.py            # Top-level GraphQL facade
+│       ├── exceptions.py        # Package-specific exceptions
+│       ├── graphql.py           # GraphQL execution and pagination
+│       ├── rest.py              # Placeholder for future REST support
+│       └── retry.py             # Shared retry policy
 ```
 
 ## Installation
@@ -62,11 +58,6 @@ export GITHUB_TOKEN="ghp_..."
 
 See [configs/](configs/) for available configuration options.
 
-## Usage
-
-> [!NOTE]
-> The SDK client and repository manager are planned but not yet implemented. Usage examples will be added alongside those modules.
-
 ## Development
 
 Requires Python >= 3.12 and [`uv`](https://docs.astral.sh/uv/).
@@ -88,7 +79,7 @@ uv run ruff format .
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow, code standards, and PR guidelines.
 
-# License
+## License
 
 <!-- Unless stated otherwise, the codebase is released under [the MIT Licence][mit]. -->
 
