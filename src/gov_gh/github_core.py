@@ -377,3 +377,64 @@ def fetch_org_members(
         page_size=page_size,
     )
 
+
+def fetch_org_owners(
+    org: str, token: SecretStr, page_size: int = 50
+) -> Iterator[dict[str, Any]]:
+    """Iterate over organisation owners (admin role members).
+
+    Args:
+        org: GitHub organisation login.
+        token: Personal access token with organisation read permissions.
+        page_size: Number of members to request per page.
+
+    Yields:
+        Owner member records containing ``login`` and optional ``name``.
+    """
+
+    def _is_owner_edge(edge: dict[str, Any]) -> bool:
+        if edge.get("role") != "ADMIN":
+            return False
+        node = edge.get("node")
+        if not isinstance(node, dict):
+            return False
+        return isinstance(node.get("login"), str) and bool(node.get("login"))
+
+    def _owner_from_edge(edge: dict[str, Any]) -> dict[str, Any]:
+        node = edge.get("node")
+        if not isinstance(node, dict):
+            return {}
+        owner: dict[str, Any] = {"login": node.get("login")}
+        if isinstance(node.get("name"), str):
+            owner["name"] = node.get("name")
+        return owner
+
+    query_str = f"""
+    query($org: String!, $cursor: String) {{
+      organization(login: $org) {{
+        membersWithRole(first: {page_size}, after: $cursor) {{
+          edges {{
+            role
+            node {{
+              login
+              name
+            }}
+          }}
+          pageInfo {{ hasNextPage endCursor }}
+        }}
+      }}
+    }}
+    """.strip()
+
+    client = _get_graphql_client(token)
+    yield from paginate_graphql_connection(
+        client=client,
+        query_str=query_str,
+        variables={"org": org},
+        logger=getLogger(__name__),
+        connection_path=["organization", "membersWithRole"],
+        node_key="edges",
+        page_size=page_size,
+        transform=_owner_from_edge,
+        filter=_is_owner_edge,
+    )

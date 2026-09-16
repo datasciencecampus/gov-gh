@@ -18,6 +18,8 @@ from gov_gh.github_core import (
     _get_graphql_client,
     _is_retriable,
     fetch_org_members,
+    fetch_org_owners,
+    fetch_org_teams,
     paginate_graphql_connection,
 )
 
@@ -461,3 +463,28 @@ class TestOrgFetchers:
             "organization",
             "membersWithRole",
         ]
+
+    def test_fetch_org_owners_filters_to_admins(self, token: SecretStr) -> None:
+        """Owner fetch should only yield members with ADMIN role."""
+
+        def fake_paginate_graphql_connection(**kwargs):
+            edge_filter = kwargs["filter"]
+            transform = kwargs["transform"]
+            edges = [
+                {"role": "MEMBER", "node": {"login": "member", "name": "Member"}},
+                {"role": "ADMIN", "node": {"login": "owner", "name": "Owner"}},
+            ]
+            return iter([transform(edge) for edge in edges if edge_filter(edge)])
+
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                side_effect=fake_paginate_graphql_connection,
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_owners("test-org", token))
+
+        assert result == [{"login": "owner", "name": "Owner"}]
+        assert mock_paginate.call_args.kwargs["node_key"] == "edges"
+
