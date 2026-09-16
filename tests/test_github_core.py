@@ -17,6 +17,7 @@ from gov_gh.github_core import (
     _get_connection_data,
     _get_graphql_client,
     _is_retriable,
+    fetch_org_members,
     paginate_graphql_connection,
 )
 
@@ -418,7 +419,7 @@ class TestPaginateGraphqlConnection:
         assert first_call_vars["cursor"] is None
         assert second_call_vars["cursor"] == "abc"
 # ---------------------------------------------------------------------------
-# fetch_org_teams 
+# fetch_org_teams / members 
 # ---------------------------------------------------------------------------
 
 
@@ -442,3 +443,21 @@ class TestOrgFetchers:
             "teams",
         ]
 
+    def test_fetch_org_members_uses_paginate_graphql_connection(
+        self, token: SecretStr
+    ) -> None:
+        """Member fetch should delegate GraphQL pagination with member connection."""
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                return_value=iter([{"login": "octocat"}]),
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_members("test-org", token))
+
+        assert result == [{"login": "octocat"}]
+        assert mock_paginate.call_args.kwargs["connection_path"] == [
+            "organization",
+            "membersWithRole",
+        ]

@@ -339,3 +339,41 @@ def fetch_org_teams(
         page_size=page_size,
     )
 
+
+def fetch_org_members(
+    org: str, token: SecretStr, page_size: int = 50
+) -> Iterator[dict[str, Any]]:
+    """Iterate over all organisation members.
+
+    Args:
+        org: GitHub organisation login.
+        token: Personal access token with organisation read permissions.
+        page_size: Number of members to request per page.
+
+    Yields:
+        Raw member nodes from the GraphQL response.
+    """
+    query_str = f"""
+    query($org: String!, $cursor: String) {{
+      organization(login: $org) {{
+        membersWithRole(first: {page_size}, after: $cursor) {{
+          nodes {{
+            login
+            name
+          }}
+          pageInfo {{ hasNextPage endCursor }}
+        }}
+      }}
+    }}
+    """.strip()
+
+    client = _get_graphql_client(token)
+    yield from paginate_graphql_connection(
+        client=client,
+        query_str=query_str,
+        variables={"org": org},
+        logger=getLogger(__name__),
+        connection_path=["organization", "membersWithRole"],
+        page_size=page_size,
+    )
+

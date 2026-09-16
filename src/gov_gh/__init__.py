@@ -3,6 +3,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
 from gov_gh.github_core import (
+    fetch_org_members,
     fetch_org_teams,
 )
 
@@ -13,5 +14,6 @@ except PackageNotFoundError:
 
 __all__ = [
     "__version__",
+    "fetch_org_members",
     "fetch_org_teams",
 ]
