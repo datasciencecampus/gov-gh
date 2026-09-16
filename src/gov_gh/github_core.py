@@ -200,7 +200,7 @@ def _execute_rest_get(
         operation=run_request,
         logger=logger,
         max_retries=max_retries,
-        is_retriable=lambda error: isinstance(error, requests.RequestException),
+        is_retriable=_is_retriable,
         operation_name=f"REST request to {url}",
     )
 
