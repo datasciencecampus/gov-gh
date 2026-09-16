@@ -368,7 +368,7 @@ def paginate_rest_collection[T](
         url: Full REST endpoint URL.
         token: Personal access token with required permissions.
         logger: Logger instance for retry and progress logging.
-        page_size: Number of items per page (default is 100).
+        page_size: Number of items per page (default is 50).
         max_retries: Maximum retries for transient request failures.
         transform: Optional function to transform raw item dicts.
         filter: Optional predicate to select raw item dicts.
