@@ -14,6 +14,7 @@ from gov_gh.exceptions import GraphQLResponseError
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 REST_API_BASE_URL = "https://api.github.com"
+REST_PAGE_SIZE = 100
 
 
 RETRIABLE_HTTP_STATUS_CODES: frozenset[HTTPStatus] = frozenset(
@@ -119,9 +120,13 @@ def _execute_with_retries[T](
         T: The operation result.
 
     Raises:
+        ValueError: If ``max_retries`` is less than 1.
         Exception: Re-raises the underlying operation error once retries are exhausted
             or if the error is non-retriable.
     """
+    if max_retries < 1:
+        raise ValueError("max_retries must be at least 1")
+
     retry_count = 0
     while True:
         try:
