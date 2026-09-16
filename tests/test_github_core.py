@@ -17,7 +17,7 @@ from gov_gh.github_core import (
     _get_connection_data,
     _get_graphql_client,
     _is_retriable,
-    paginate_connection,
+    paginate_graphql_connection,
 )
 
 # ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ class TestGetConnectionData:
 
 
 # ---------------------------------------------------------------------------
-# paginate_connection
+# paginate_graphql_connection
 # ---------------------------------------------------------------------------
 
 
@@ -287,7 +287,7 @@ def _make_page(items: list, has_next: bool, end_cursor: str | None = None) -> di
     }
 
 
-class TestPaginateConnection:
+class TestPaginateGraphqlConnection:
     def test_single_page_yields_all_items(
         self, mock_client: MagicMock, logger: logging.Logger
     ) -> None:
@@ -305,7 +305,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -324,7 +324,7 @@ class TestPaginateConnection:
             patch("gov_gh.github_core._execute_graphql_query", side_effect=pages),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -342,7 +342,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client,
                     "query {}",
                     {},
@@ -367,7 +367,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client,
                     "query {}",
                     {},
@@ -389,7 +389,7 @@ class TestPaginateConnection:
             pytest.raises(GraphQLResponseError),
         ):
             list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -409,7 +409,7 @@ class TestPaginateConnection:
             ) as mock_execute,
         ):
             list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {"org": "myorg"}, logger, ["org", "repos"]
                 )
             )

@@ -165,7 +165,35 @@ def _get_connection_data(
         )
 
 
-def paginate_connection[T](
+def _paginate_items[T, S](
+    initial_state: S,
+    fetch_page: Callable[[S], tuple[list[dict[str, Any]], S | None]],
+    transform: Callable[[dict[str, Any]], T] = (lambda x: x),
+    filter: Callable[[dict[str, Any]], bool] = (lambda _item: True),
+) -> Iterator[T]:
+    """Yield transformed items from a generic paginated source.
+
+    Args:
+        initial_state: Initial pagination state (for example page number or cursor).
+        fetch_page: Callable returning ``(items, next_state)`` for the current state.
+        transform: Optional function to transform each item before yielding.
+        filter: Optional predicate to include items before transformation.
+
+    Yields:
+        T: Transformed items from all pages.
+    """
+    state = initial_state
+    while True:
+        items, next_state = fetch_page(state)
+        for item in items:
+            if filter(item):
+                yield transform(item)
+        if next_state is None:
+            return
+        state = next_state
+
+
+def paginate_graphql_connection[T](
     client: Client,
     query_str: str,
     variables: dict[str, Any],
@@ -176,49 +204,56 @@ def paginate_connection[T](
     transform: Callable[[dict[str, Any]], T] = (lambda x: x),
     filter: Callable[[dict[str, Any]], bool] = (lambda _node: True),
 ) -> Iterator[T]:
-    """Helper to paginate through a GraphQL connection.
+    """Paginate a GraphQL connection.
+
     Args:
         client: Configured GraphQL client instance.
-        query_str: GraphQL query string with $org and $cursor variables.
+        query_str: GraphQL query string with $cursor variable.
         variables: Variables for the GraphQL query.
         logger: Logger instance for logging pagination progress.
-        connection_path: Path to the connection field in the GraphQL response
-            (e.g. ["organization", "repositories"]).
-        node_key: Key for the nodes in the connection (default is "nodes").
+        connection_path: Path to the GraphQL connection field in the response.
+        node_key: Key for nodes within the connection (default ``"nodes"``).
         page_size: Number of items per page (default is 50).
-        transform: Optional function to transform raw node or edge dicts before
-            yielding (default is identity).
-        filter: Optional predicate to filter raw node or edge dicts before
-            transformation/yielding (default yields all).
+        transform: Optional function to transform raw node/edge dicts.
+        filter: Optional predicate to select raw node/edge dicts.
+
     Yields:
-        T: Transformed node from the connection.
+        T: Transformed items from the GraphQL connection.
     """
     query = gql(query_str)
-    cursor: str | None = None
     page_index = 0
-    while True:
+    total_items = 0
+
+    def fetch_page(cursor: str | None) -> tuple[list[dict[str, Any]], str | None]:
+        nonlocal page_index
+        nonlocal total_items
         n_variables = variables | {"cursor": cursor}
         result = _execute_graphql_query(client, query, n_variables, logger)
         connection = _get_connection(result, connection_path)
         data = _get_connection_data(connection, logger)
-        for item in data:
-            if filter(item):
-                yield transform(item)
+        total_items += len(data)
         page_info = connection.get("pageInfo")
         if not page_info:
             raise GraphQLResponseError(
                 f"Unexpected Response: {connection_path} pageInfo is missing"
             )
         if page_info.get("hasNextPage"):
-            cursor = page_info.get("endCursor")
+            next_cursor = page_info.get("endCursor")
             page_index += 1
-        else:
-            logger.info(
-                "Pagination complete after %d pages, %d total items for "
-                "connection path: %s (page_size: %d)",
-                page_index + 1,
-                page_index * page_size + len(data),
-                connection_path,
-                page_size,
-            )
-            break
+            return data, next_cursor
+        return data, None
+
+    yield from _paginate_items(
+        initial_state=None,
+        fetch_page=fetch_page,
+        transform=transform,
+        filter=filter,
+    )
+    logger.info(
+        "Pagination complete after %d pages, %d total items for "
+        "connection path: %s (page_size: %d)",
+        page_index + 1,
+        total_items,
+        connection_path,
+        page_size,
+    )
