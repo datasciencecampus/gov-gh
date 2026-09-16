@@ -382,6 +382,9 @@ def paginate_rest_collection[T](
         TypeError: If the endpoint does not return a JSON list payload.
     """
 
+    if page_size < 1:
+        raise ValueError("page_size must be at least 1")
+
     def fetch_page(page: int) -> tuple[list[dict[str, Any]], int | None]:
         response = _execute_rest_get(
             url=url,
