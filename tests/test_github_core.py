@@ -17,10 +17,12 @@ from gov_gh.github_core import (
     _get_connection_data,
     _get_graphql_client,
     _is_retriable,
+    fetch_org_invitations,
     fetch_org_members,
     fetch_org_owners,
     fetch_org_teams,
     paginate_graphql_connection,
+    paginate_rest_collection,
 )
 
 # ---------------------------------------------------------------------------
@@ -420,8 +422,58 @@ class TestPaginateGraphqlConnection:
         second_call_vars = mock_execute.call_args_list[1][0][2]
         assert first_call_vars["cursor"] is None
         assert second_call_vars["cursor"] == "abc"
+
+
 # ---------------------------------------------------------------------------
-# fetch_org_teams / members 
+# paginate_rest_collection
+# ---------------------------------------------------------------------------
+
+
+class TestPaginateRestCollection:
+    def test_raises_when_max_retries_invalid(self, logger: logging.Logger) -> None:
+        """Should reject invalid retry configuration."""
+        with pytest.raises(ValueError):
+            list(
+                paginate_rest_collection(
+                    url="https://api.github.com/orgs/test-org/invitations",
+                    token=SecretStr("ghp_testtoken123"),
+                    logger=logger,
+                    max_retries=0,
+                )
+            )
+
+    def test_fetches_multiple_pages(
+        self, token: SecretStr, logger: logging.Logger
+    ) -> None:
+        """Should collect and merge results until the final partial page."""
+        first_response = MagicMock()
+        first_response.json.return_value = [{"id": 1}] * 100
+        first_response.raise_for_status.return_value = None
+
+        second_response = MagicMock()
+        second_response.json.return_value = [{"id": 2}]
+        second_response.raise_for_status.return_value = None
+
+        with patch(
+            "gov_gh.github_core.requests.get",
+            side_effect=[first_response, second_response],
+        ) as mock_get:
+            result = list(
+                paginate_rest_collection(
+                    url="https://api.github.com/orgs/test-org/invitations",
+                    token=token,
+                    logger=logger,
+                    page_size=100,
+                )
+            )
+
+        assert len(result) == 101
+        assert result[-1]["id"] == 2
+        assert mock_get.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# fetch_org_teams / members / owners / invitations
 # ---------------------------------------------------------------------------
 
 
@@ -488,3 +540,17 @@ class TestOrgFetchers:
         assert result == [{"login": "owner", "name": "Owner"}]
         assert mock_paginate.call_args.kwargs["node_key"] == "edges"
 
+    def test_fetch_org_invitations_uses_rest_pagination(self, token: SecretStr) -> None:
+        """Invitation fetch should call the org invitations REST endpoint."""
+        expected = [{"id": 123}]
+        with patch(
+            "gov_gh.github_core.paginate_rest_collection",
+            return_value=iter(expected),
+        ) as mock_paginate:
+            result = fetch_org_invitations("test-org", token)
+
+        assert result == expected
+        assert (
+            mock_paginate.call_args.kwargs["url"]
+            == "https://api.github.com/orgs/test-org/invitations"
+        )

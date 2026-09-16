@@ -2,6 +2,7 @@
 
 from gov_gh import (
     __version__,
+    fetch_org_invitations,
     fetch_org_members,
     fetch_org_owners,
     fetch_org_teams,
@@ -18,3 +19,4 @@ def test_public_fetch_functions_are_exposed() -> None:
     assert callable(fetch_org_teams)
     assert callable(fetch_org_members)
     assert callable(fetch_org_owners)
+    assert callable(fetch_org_invitations)

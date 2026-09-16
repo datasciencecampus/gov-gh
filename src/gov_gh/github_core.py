@@ -156,6 +156,49 @@ def _execute_with_retries[T](
                 raise
 
 
+def _execute_rest_get(
+    url: str,
+    token: SecretStr,
+    logger: Logger,
+    page: int,
+    page_size: int,
+    max_retries: int = 3,
+) -> requests.Response:
+    """Execute a GitHub REST GET request with retry logic.
+
+    Args:
+        url: Full REST endpoint URL.
+        token: Personal access token.
+        logger: Logger instance for retry and failure logging.
+        page: Page number to fetch.
+        page_size: Number of items per page.
+        max_retries: Maximum number of retry attempts.
+
+    Returns:
+        requests.Response: Successful HTTP response.
+
+    Raises:
+        requests.RequestException: If retries are exhausted.
+    """
+
+    def run_request() -> requests.Response:
+        response = requests.get(
+            url,
+            headers=_get_auth_headers(token),
+            params={"per_page": page_size, "page": page},
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response
+
+    return _execute_with_retries(
+        operation=run_request,
+        logger=logger,
+        max_retries=max_retries,
+        is_retriable=lambda error: isinstance(error, requests.RequestException),
+        operation_name=f"REST request to {url}",
+    )
+
 def _get_connection(
     result: dict[str, Any], connection_path: list[str]
 ) -> dict[str, Any]:
@@ -302,6 +345,63 @@ def paginate_graphql_connection[T](
         connection_path,
         page_size,
     )
+
+
+def paginate_rest_collection[T](
+    url: str,
+    token: SecretStr,
+    logger: Logger,
+    page_size: int = 50,
+    max_retries: int = 3,
+    transform: Callable[[dict[str, Any]], T] = (lambda x: x),
+    filter: Callable[[dict[str, Any]], bool] = (lambda _item: True),
+) -> Iterator[T]:
+    """Paginate a REST collection endpoint.
+
+    Args:
+        url: Full REST endpoint URL.
+        token: Personal access token with required permissions.
+        logger: Logger instance for retry and progress logging.
+        page_size: Number of items per page (default is 100).
+        max_retries: Maximum retries for transient request failures.
+        transform: Optional function to transform raw item dicts.
+        filter: Optional predicate to select raw item dicts.
+
+    Yields:
+        T: Transformed items from the REST collection.
+
+    Raises:
+        ValueError: If ``max_retries`` is less than 1.
+        requests.RequestException: If request retries are exhausted.
+        TypeError: If the endpoint does not return a JSON list payload.
+    """
+
+    def fetch_page(page: int) -> tuple[list[dict[str, Any]], int | None]:
+        response = _execute_rest_get(
+            url=url,
+            token=token,
+            logger=logger,
+            page=page,
+            page_size=page_size,
+            max_retries=max_retries,
+        )
+        payload: Any = response.json()
+        if not isinstance(payload, list):
+            raise TypeError(f"Expected a list response from {url}")
+
+        items = [item for item in payload if isinstance(item, dict)]
+        if len(payload) < page_size:
+            return items, None
+        return items, page + 1
+
+    yield from _paginate_items(
+        initial_state=1,
+        fetch_page=fetch_page,
+        transform=transform,
+        filter=filter,
+    )
+
+
 def fetch_org_teams(
     org: str, token: SecretStr, page_size: int = 50
 ) -> Iterator[dict[str, Any]]:
@@ -437,4 +537,25 @@ def fetch_org_owners(
         page_size=page_size,
         transform=_owner_from_edge,
         filter=_is_owner_edge,
+    )
+
+
+def fetch_org_invitations(org: str, token: SecretStr) -> list[dict[str, Any]]:
+    """Fetch pending organisation invitations via REST.
+
+    Args:
+        org: GitHub organisation login.
+        token: Personal access token with invitations read permissions.
+
+    Returns:
+        Raw invitation objects returned by ``GET /orgs/{org}/invitations``.
+    """
+    url = f"{REST_API_BASE_URL}/orgs/{org}/invitations"
+    return list(
+        paginate_rest_collection(
+            url=url,
+            token=token,
+            logger=getLogger(__name__),
+            page_size=REST_PAGE_SIZE,
+        )
     )
