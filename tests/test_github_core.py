@@ -295,8 +295,9 @@ class TestExecuteWithRetries:
     def test_raises_after_retries_exhausted(self, logger: logging.Logger) -> None:
         """Should raise after reaching the configured retry limit."""
         operation = MagicMock(side_effect=ConnectionError("timeout"))
-        with patch("gov_gh.github_core.sleep") as mock_sleep, pytest.raises(
-            ConnectionError
+        with (
+            patch("gov_gh.github_core.sleep") as mock_sleep,
+            pytest.raises(ConnectionError),
         ):
             _execute_with_retries(
                 operation=operation,

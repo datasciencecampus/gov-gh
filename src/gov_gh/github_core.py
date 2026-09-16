@@ -204,6 +204,7 @@ def _execute_rest_get(
         operation_name=f"REST request to {url}",
     )
 
+
 def _get_connection(
     result: dict[str, Any], connection_path: list[str]
 ) -> dict[str, Any]:
