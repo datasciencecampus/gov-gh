@@ -4,6 +4,7 @@ from logging import Logger
 from time import sleep
 from typing import Any
 
+import requests
 from gql import Client, gql
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
@@ -12,6 +13,7 @@ from pydantic import SecretStr
 from gov_gh.exceptions import GraphQLResponseError
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
+REST_API_BASE_URL = "https://api.github.com"
 
 RETRIABLE_HTTP_STATUS_CODES: frozenset[HTTPStatus] = frozenset(
     {
@@ -68,46 +70,88 @@ def _execute_graphql_query(
     max_retries: int = 3,
 ) -> dict[str, Any]:
     """Execute a GraphQL query with retry logic for transient errors.
+
     Args:
         client: Configured GraphQL client instance.
         query: Compiled GraphQL query object.
         variables: Dictionary of variables to pass to the query.
         logger: Logger instance for logging retries and errors.
         max_retries: Maximum number of retry attempts for transient errors.
+
     Returns:
-        Dict[str, Any]: The result of the GraphQL query execution.
+        dict[str, Any]: The result of the GraphQL query execution.
+
     Raises:
-        Exception: If the query fails after the maximum number of retries or a
-            non-retriable error occurs.
+        Exception: If the query fails after retries or with a non-retriable error.
     """
-    attempt = 0
+
+    def run_query() -> dict[str, Any]:
+        result: dict[str, Any] = client.execute(query, variable_values=variables)
+        return result
+
+    return _execute_with_retries(
+        operation=run_query,
+        logger=logger,
+        max_retries=max_retries,
+        is_retriable=_is_retriable,
+        operation_name="GraphQL query",
+    )
+
+
+def _execute_with_retries[T](
+    operation: Callable[[], T],
+    logger: Logger,
+    max_retries: int,
+    is_retriable: Callable[[Exception], bool],
+    operation_name: str,
+) -> T:
+    """Execute an operation with retry/backoff for retriable failures.
+
+    Args:
+        operation: Zero-argument callable that performs the operation.
+        logger: Logger instance for retry and failure logging.
+        max_retries: Maximum number of retry attempts.
+        is_retriable: Predicate deciding whether an exception should be retried.
+        operation_name: Human-readable operation name for logs.
+
+    Returns:
+        T: The operation result.
+
+    Raises:
+        Exception: Re-raises the underlying operation error once retries are exhausted
+            or if the error is non-retriable.
+    """
+    retry_count = 0
     while True:
         try:
-            result: dict[str, Any] = client.execute(query, variable_values=variables)
-            return result
-        except Exception as e:
-            if _is_retriable(e):
-                if attempt < max_retries:  # Case retriable
-                    attempt += 1
-                    backoff = 2 ** (attempt - 1)
+            return operation()
+        except Exception as error:
+            if is_retriable(error):
+                if retry_count < max_retries:
+                    retry_count += 1
+                    backoff = 2 ** (retry_count - 1)
                     logger.warning(
-                        "GraphQL query attempt %d/%d failed with retriable "
-                        "error %s. Retrying in %d seconds...",
-                        attempt,
+                        "%s attempt %d/%d failed with retriable error %s. "
+                        "Retrying in %d seconds...",
+                        operation_name,
+                        retry_count,
                         max_retries,
-                        e,
+                        error,
                         backoff,
                     )
                     sleep(backoff)
-                else:  # Too many retries
+                else:
                     logger.error(
-                        "GraphQL query failed after %d/%d attempts",
-                        attempt,
+                        "%s failed after %d/%d attempts",
+                        operation_name,
+                        retry_count,
                         max_retries,
                     )
                     raise
-            else:  # Non-retriable error
-                logger.error("GraphQL query failed with non-retriable error: %s", e)
+            else:
+                logger.error(
+                    "%s failed with non-retriable error: %s", operation_name, error
+                )
                 raise
 
 
