@@ -417,3 +417,28 @@ class TestPaginateGraphqlConnection:
         second_call_vars = mock_execute.call_args_list[1][0][2]
         assert first_call_vars["cursor"] is None
         assert second_call_vars["cursor"] == "abc"
+# ---------------------------------------------------------------------------
+# fetch_org_teams 
+# ---------------------------------------------------------------------------
+
+
+class TestOrgFetchers:
+    def test_fetch_org_teams_uses_paginate_graphql_connection(
+        self, token: SecretStr
+    ) -> None:
+        """Team fetch should delegate GraphQL pagination with team connection path."""
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                return_value=iter([{"slug": "platform"}]),
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_teams("test-org", token))
+
+        assert result == [{"slug": "platform"}]
+        assert mock_paginate.call_args.kwargs["connection_path"] == [
+            "organization",
+            "teams",
+        ]
+

@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterator
 from http import HTTPStatus
-from logging import Logger
+from logging import Logger, getLogger
 from time import sleep
 from typing import Any
 
@@ -14,6 +14,7 @@ from gov_gh.exceptions import GraphQLResponseError
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 REST_API_BASE_URL = "https://api.github.com"
+
 
 RETRIABLE_HTTP_STATUS_CODES: frozenset[HTTPStatus] = frozenset(
     {
@@ -301,3 +302,40 @@ def paginate_graphql_connection[T](
         connection_path,
         page_size,
     )
+def fetch_org_teams(
+    org: str, token: SecretStr, page_size: int = 50
+) -> Iterator[dict[str, Any]]:
+    """Iterate over all teams in a GitHub organisation.
+
+    Args:
+        org: GitHub organisation login.
+        token: Personal access token with organisation read permissions.
+        page_size: Number of teams to request per page.
+
+    Yields:
+        Raw team nodes from the GraphQL response.
+    """
+    query_str = f"""
+    query($org: String!, $cursor: String) {{
+      organization(login: $org) {{
+        teams(first: {page_size}, after: $cursor) {{
+          nodes {{
+            name
+            slug
+          }}
+          pageInfo {{ hasNextPage endCursor }}
+        }}
+      }}
+    }}
+    """.strip()
+
+    client = _get_graphql_client(token)
+    yield from paginate_graphql_connection(
+        client=client,
+        query_str=query_str,
+        variables={"org": org},
+        logger=getLogger(__name__),
+        connection_path=["organization", "teams"],
+        page_size=page_size,
+    )
+
