@@ -3,21 +3,31 @@ retry logic, connection extraction, and cursor-based pagination."""
 
 import logging
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+import requests
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 from pydantic import SecretStr
 
 from gov_gh.exceptions import GraphQLResponseError
 from gov_gh.github_core import (
     _execute_graphql_query,
+    _execute_rest_get,
+    _execute_with_retries,
     _get_auth_headers,
     _get_connection,
     _get_connection_data,
     _get_graphql_client,
     _is_retriable,
-    paginate_connection,
+    _paginate_items,
+    fetch_org_invitations,
+    fetch_org_members,
+    fetch_org_owners,
+    fetch_org_teams,
+    paginate_graphql_connection,
+    paginate_rest_collection,
 )
 
 # ---------------------------------------------------------------------------
@@ -204,6 +214,179 @@ class TestExecuteGraphqlQuery:
             _execute_graphql_query(mock_client, MagicMock(), {}, logger, max_retries=4)
         assert mock_sleep.call_args_list == [call(1), call(2), call(4)]
 
+    def test_delegates_to_retry_executor(
+        self, mock_client: MagicMock, logger: logging.Logger
+    ) -> None:
+        """GraphQL wrapper should delegate retry behavior to shared executor."""
+        expected = {"ok": True}
+        with patch(
+            "gov_gh.github_core._execute_with_retries",
+            return_value=expected,
+        ) as mock_retry:
+            result = _execute_graphql_query(
+                mock_client, MagicMock(), {"org": "test-org"}, logger, max_retries=5
+            )
+
+        assert result == expected
+        assert mock_retry.call_args.kwargs["max_retries"] == 5
+        assert mock_retry.call_args.kwargs["operation_name"] == "GraphQL query"
+
+
+# ---------------------------------------------------------------------------
+# _execute_with_retries
+# ---------------------------------------------------------------------------
+
+
+class TestExecuteWithRetries:
+    def test_raises_when_max_retries_invalid(self, logger: logging.Logger) -> None:
+        """Should reject invalid retry configuration."""
+        operation = MagicMock(return_value="ok")
+        with pytest.raises(ValueError):
+            _execute_with_retries(
+                operation=operation,
+                logger=logger,
+                max_retries=0,
+                is_retriable=lambda _error: True,
+                operation_name="test-op",
+            )
+
+    def test_returns_value_without_retry(self, logger: logging.Logger) -> None:
+        """Should return immediately when the operation succeeds first time."""
+        operation = MagicMock(return_value="ok")
+        result = _execute_with_retries(
+            operation=operation,
+            logger=logger,
+            max_retries=3,
+            is_retriable=lambda _error: True,
+            operation_name="test-op",
+        )
+        assert result == "ok"
+        assert operation.call_count == 1
+
+    def test_retries_then_succeeds(self, logger: logging.Logger) -> None:
+        """Should retry retriable failures and then return the success value."""
+        operation = MagicMock(side_effect=[ConnectionError("timeout"), "ok"])
+        with patch("gov_gh.github_core.sleep") as mock_sleep:
+            result = _execute_with_retries(
+                operation=operation,
+                logger=logger,
+                max_retries=3,
+                is_retriable=lambda error: isinstance(error, ConnectionError),
+                operation_name="test-op",
+            )
+        assert result == "ok"
+        assert operation.call_count == 2
+        assert mock_sleep.call_args_list == [call(1)]
+
+    def test_raises_immediately_on_non_retriable(self, logger: logging.Logger) -> None:
+        """Should not retry errors that are marked non-retriable."""
+        operation = MagicMock(side_effect=ValueError("bad value"))
+        with patch("gov_gh.github_core.sleep") as mock_sleep, pytest.raises(ValueError):
+            _execute_with_retries(
+                operation=operation,
+                logger=logger,
+                max_retries=3,
+                is_retriable=lambda _error: False,
+                operation_name="test-op",
+            )
+        assert operation.call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_raises_after_retries_exhausted(self, logger: logging.Logger) -> None:
+        """Should raise after reaching the configured retry limit."""
+        operation = MagicMock(side_effect=ConnectionError("timeout"))
+        with (
+            patch("gov_gh.github_core.sleep") as mock_sleep,
+            pytest.raises(ConnectionError),
+        ):
+            _execute_with_retries(
+                operation=operation,
+                logger=logger,
+                max_retries=2,
+                is_retriable=lambda error: isinstance(error, ConnectionError),
+                operation_name="test-op",
+            )
+        assert operation.call_count == 3
+        assert mock_sleep.call_args_list == [call(1), call(2)]
+
+
+# ---------------------------------------------------------------------------
+# _execute_rest_get
+# ---------------------------------------------------------------------------
+
+
+class TestExecuteRestGet:
+    def test_calls_requests_get_with_expected_arguments(
+        self, token: SecretStr, logger: logging.Logger
+    ) -> None:
+        """Should issue a GET with auth headers and pagination params."""
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        with patch(
+            "gov_gh.github_core.requests.get", return_value=response
+        ) as mock_get:
+            result = _execute_rest_get(
+                url="https://api.github.com/orgs/test-org/invitations",
+                token=token,
+                logger=logger,
+                page=2,
+                page_size=100,
+            )
+
+        assert result is response
+        _, kwargs = mock_get.call_args
+        assert kwargs["params"] == {"per_page": 100, "page": 2}
+        assert kwargs["timeout"] == 30
+        assert kwargs["headers"]["Authorization"].startswith("Bearer ")
+
+    def test_retries_request_exceptions(
+        self, token: SecretStr, logger: logging.Logger
+    ) -> None:
+        """Should retry transient request exceptions using exponential backoff."""
+        success_response = MagicMock()
+        success_response.raise_for_status.return_value = None
+        with (
+            patch(
+                "gov_gh.github_core.requests.get",
+                side_effect=[requests.RequestException("boom"), success_response],
+            ) as mock_get,
+            patch("gov_gh.github_core.sleep") as mock_sleep,
+        ):
+            result = _execute_rest_get(
+                url="https://api.github.com/orgs/test-org/invitations",
+                token=token,
+                logger=logger,
+                page=1,
+                page_size=50,
+                max_retries=3,
+            )
+
+        assert result is success_response
+        assert mock_get.call_count == 2
+        assert mock_sleep.call_args_list == [call(1)]
+
+    def test_raises_when_retries_exhausted(
+        self, token: SecretStr, logger: logging.Logger
+    ) -> None:
+        """Should raise request exceptions after exhausting retries."""
+        with (
+            patch(
+                "gov_gh.github_core.requests.get",
+                side_effect=requests.RequestException("boom"),
+            ),
+            patch("gov_gh.github_core.sleep") as mock_sleep,
+            pytest.raises(requests.RequestException),
+        ):
+            _execute_rest_get(
+                url="https://api.github.com/orgs/test-org/invitations",
+                token=token,
+                logger=logger,
+                page=1,
+                page_size=50,
+                max_retries=2,
+            )
+        assert mock_sleep.call_args_list == [call(1), call(2)]
+
 
 # ---------------------------------------------------------------------------
 # _get_connection
@@ -271,7 +454,52 @@ class TestGetConnectionData:
 
 
 # ---------------------------------------------------------------------------
-# paginate_connection
+# _paginate_items
+# ---------------------------------------------------------------------------
+
+
+class TestPaginateItems:
+    def test_paginates_until_next_state_is_none(self) -> None:
+        """Should continue fetching pages until fetch_page returns no next state."""
+        calls: list[str | None] = []
+
+        def fetch_page(state: str | None) -> tuple[list[dict[str, Any]], str | None]:
+            calls.append(state)
+            if state is None:
+                return [{"id": 1}, {"id": 2}], "next"
+            return [{"id": 3}], None
+
+        result = list(
+            _paginate_items(
+                initial_state=None,
+                fetch_page=fetch_page,
+                transform=lambda item: item["id"],
+            )
+        )
+
+        assert result == [1, 2, 3]
+        assert calls == [None, "next"]
+
+    def test_applies_filter_before_transform(self) -> None:
+        """Should filter items before yielding transformed output."""
+
+        def fetch_page(_state: int) -> tuple[list[dict[str, Any]], int | None]:
+            return [{"id": 1, "keep": True}, {"id": 2, "keep": False}], None
+
+        result = list(
+            _paginate_items(
+                initial_state=1,
+                fetch_page=fetch_page,
+                filter=lambda item: item["keep"],
+                transform=lambda item: item["id"],
+            )
+        )
+
+        assert result == [1]
+
+
+# ---------------------------------------------------------------------------
+# paginate_graphql_connection
 # ---------------------------------------------------------------------------
 
 
@@ -287,7 +515,7 @@ def _make_page(items: list, has_next: bool, end_cursor: str | None = None) -> di
     }
 
 
-class TestPaginateConnection:
+class TestPaginateGraphqlConnection:
     def test_single_page_yields_all_items(
         self, mock_client: MagicMock, logger: logging.Logger
     ) -> None:
@@ -305,7 +533,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -324,7 +552,7 @@ class TestPaginateConnection:
             patch("gov_gh.github_core._execute_graphql_query", side_effect=pages),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -342,7 +570,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client,
                     "query {}",
                     {},
@@ -367,7 +595,7 @@ class TestPaginateConnection:
             ),
         ):
             items = list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client,
                     "query {}",
                     {},
@@ -389,7 +617,7 @@ class TestPaginateConnection:
             pytest.raises(GraphQLResponseError),
         ):
             list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {}, logger, ["org", "repos"]
                 )
             )
@@ -409,7 +637,7 @@ class TestPaginateConnection:
             ) as mock_execute,
         ):
             list(
-                paginate_connection(
+                paginate_graphql_connection(
                     mock_client, "query {}", {"org": "myorg"}, logger, ["org", "repos"]
                 )
             )
@@ -417,3 +645,135 @@ class TestPaginateConnection:
         second_call_vars = mock_execute.call_args_list[1][0][2]
         assert first_call_vars["cursor"] is None
         assert second_call_vars["cursor"] == "abc"
+
+
+# ---------------------------------------------------------------------------
+# paginate_rest_collection
+# ---------------------------------------------------------------------------
+
+
+class TestPaginateRestCollection:
+    def test_raises_when_max_retries_invalid(self, logger: logging.Logger) -> None:
+        """Should reject invalid retry configuration."""
+        with pytest.raises(ValueError):
+            list(
+                paginate_rest_collection(
+                    url="https://api.github.com/orgs/test-org/invitations",
+                    token=SecretStr("ghp_testtoken123"),
+                    logger=logger,
+                    max_retries=0,
+                )
+            )
+
+    def test_fetches_multiple_pages(
+        self, token: SecretStr, logger: logging.Logger
+    ) -> None:
+        """Should collect and merge results until the final partial page."""
+        first_response = MagicMock()
+        first_response.json.return_value = [{"id": 1}] * 100
+        first_response.raise_for_status.return_value = None
+
+        second_response = MagicMock()
+        second_response.json.return_value = [{"id": 2}]
+        second_response.raise_for_status.return_value = None
+
+        with patch(
+            "gov_gh.github_core.requests.get",
+            side_effect=[first_response, second_response],
+        ) as mock_get:
+            result = list(
+                paginate_rest_collection(
+                    url="https://api.github.com/orgs/test-org/invitations",
+                    token=token,
+                    logger=logger,
+                    page_size=100,
+                )
+            )
+
+        assert len(result) == 101
+        assert result[-1]["id"] == 2
+        assert mock_get.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# fetch_org_teams / members / owners / invitations
+# ---------------------------------------------------------------------------
+
+
+class TestOrgFetchers:
+    def test_fetch_org_teams_uses_paginate_graphql_connection(
+        self, token: SecretStr
+    ) -> None:
+        """Team fetch should delegate GraphQL pagination with team connection path."""
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                return_value=iter([{"slug": "platform"}]),
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_teams("test-org", token))
+
+        assert result == [{"slug": "platform"}]
+        assert mock_paginate.call_args.kwargs["connection_path"] == [
+            "organization",
+            "teams",
+        ]
+
+    def test_fetch_org_members_uses_paginate_graphql_connection(
+        self, token: SecretStr
+    ) -> None:
+        """Member fetch should delegate GraphQL pagination with member connection."""
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                return_value=iter([{"login": "octocat"}]),
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_members("test-org", token))
+
+        assert result == [{"login": "octocat"}]
+        assert mock_paginate.call_args.kwargs["connection_path"] == [
+            "organization",
+            "membersWithRole",
+        ]
+
+    def test_fetch_org_owners_filters_to_admins(self, token: SecretStr) -> None:
+        """Owner fetch should only yield members with ADMIN role."""
+
+        def fake_paginate_graphql_connection(**kwargs):
+            edge_filter = kwargs["filter"]
+            transform = kwargs["transform"]
+            edges = [
+                {"role": "MEMBER", "node": {"login": "member", "name": "Member"}},
+                {"role": "ADMIN", "node": {"login": "owner", "name": "Owner"}},
+            ]
+            return iter([transform(edge) for edge in edges if edge_filter(edge)])
+
+        with (
+            patch("gov_gh.github_core._get_graphql_client", return_value=MagicMock()),
+            patch(
+                "gov_gh.github_core.paginate_graphql_connection",
+                side_effect=fake_paginate_graphql_connection,
+            ) as mock_paginate,
+        ):
+            result = list(fetch_org_owners("test-org", token))
+
+        assert result == [{"login": "owner", "name": "Owner"}]
+        assert mock_paginate.call_args.kwargs["node_key"] == "edges"
+
+    def test_fetch_org_invitations_uses_rest_pagination(self, token: SecretStr) -> None:
+        """Invitation fetch should call the org invitations REST endpoint."""
+        expected = [{"id": 123}]
+        with patch(
+            "gov_gh.github_core.paginate_rest_collection",
+            return_value=iter(expected),
+        ) as mock_paginate:
+            result = fetch_org_invitations("test-org", token)
+
+        assert result == expected
+        assert (
+            mock_paginate.call_args.kwargs["url"]
+            == "https://api.github.com/orgs/test-org/invitations"
+        )
