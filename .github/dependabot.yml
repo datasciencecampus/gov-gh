@@ -25,8 +25,7 @@ updates:
     commit-message:
       prefix: "chore(uv)"
 
-
-  # Github actions in workflows
+  # GitHub Actions in workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -46,3 +45,26 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(github-actions)"
+
+  # Pre-commit hooks
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "07:00"
+      timezone: "Europe/London"
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      pre-commit-major:
+        update-types:
+          - "major"
+    labels: ["dependencies", "pre-commit", "automation"]
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(pre-commit)"
