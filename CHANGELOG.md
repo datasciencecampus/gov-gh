@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/datasciencecampus/gov-gh/compare/v0.4.0...v0.5.0) (2026-09-22)
+
+
+### Features
+
+* **client:** Org fetch apis ([fb6196d](https://github.com/datasciencecampus/gov-gh/commit/fb6196d23e7930b2e52d1ba7613348f5869c28d4))
+
 ## [0.4.0](https://github.com/datasciencecampus/gov-gh/compare/v0.3.1...v0.4.0) (2026-09-02)
 
 
